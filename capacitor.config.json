@@ -1,0 +1,16 @@
+{
+  "appId": "com.mybills.app",
+  "appName": "MyBills",
+  "webDir": "dist",
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_mybills_mono",
+      "iconColor": "#0F766E"
+    },
+    "StatusBar": {
+      "overlaysWebView": false,
+      "backgroundColor": "#16212A",
+      "style": "DARK"
+    }
+  }
+}
