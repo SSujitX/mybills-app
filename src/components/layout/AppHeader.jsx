@@ -1,6 +1,6 @@
 export default function AppHeader() {
   const scrollHome = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.querySelector('.app-main')?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -11,13 +11,10 @@ export default function AppHeader() {
         onClick={scrollHome}
         aria-label="Return to MyBills top"
       >
-        <span className="app-header-top">
-          <span className="app-header-logo-wrap" aria-hidden="true">
-            <img src="/mybills-logo.png" alt="" className="app-header-logo" />
-          </span>
-          <strong className="app-header-title">MyBills</strong>
+        <span className="app-header-logo-wrap" aria-hidden="true">
+          <img src="/mybills-logo.png" alt="" className="app-header-logo" />
         </span>
-        <span className="app-header-tagline">Bill reminders</span>
+        <strong className="app-header-title">MyBills</strong>
       </button>
     </header>
   );
