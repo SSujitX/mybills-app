@@ -1,0 +1,13 @@
+# Copy this file to: android/keystore/signing.properties
+# Do not commit signing.properties or keystore files.
+# Path is relative to the android/ folder.
+storeFile=keystore/mybills-release.keystore
+
+# Password used when creating the keystore.
+storePassword=YOUR_KEYSTORE_PASSWORD
+
+# Alias used when creating the key.
+keyAlias=YOUR_KEY_ALIAS
+
+# Key password for the alias above.
+keyPassword=YOUR_KEY_PASSWORD
