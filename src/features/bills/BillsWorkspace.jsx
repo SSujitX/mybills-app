@@ -620,9 +620,11 @@ export default function BillsWorkspace() {
                 <label>
                   Price
                   <input
+                    className="bill-price-input"
                     min="0"
                     step="0.01"
                     type="number"
+                    inputMode="decimal"
                     value={draft.price}
                     onChange={(event) => updateDraft('price', event.target.value)}
                     placeholder="12.99"
