@@ -1,0 +1,32 @@
+{
+  "name": "mybills-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "android:add": "npx cap add android",
+    "android:icons": "npx capacitor-assets generate --android --iconBackgroundColor \"#111116\" --iconBackgroundColorDark \"#111116\"",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:release": "npm run build && npx cap sync android && cd android && gradlew.bat clean assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/local-notifications": "^8.2.0",
+    "@capacitor/status-bar": "^8.0.2",
+    "@fontsource/manrope": "^5.2.8",
+    "lucide-react": "^1.16.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.3.4",
+    "@vitejs/plugin-react": "^6.0.2",
+    "vite": "^8.0.14"
+  }
+}
