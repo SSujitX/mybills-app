@@ -75,19 +75,34 @@ export default function BillTotalsEstimateBar({ ratesState, currency, onCurrency
     return 'Live rate';
   })();
 
+  const rateStatus = ratesState.status === 'loading'
+    ? 'loading'
+    : ratesState.status === 'unavailable'
+      ? 'offline'
+      : 'live';
+
   return (
     <div className="bill-totals-estimate" aria-label="Bill total estimate">
-      <div className="bill-totals-estimate-rate" title={updatedLabel}>
-        <Activity aria-hidden="true" className="bill-totals-estimate-icon" />
-        <div className="bill-totals-estimate-rate-copy">
+      <section
+        className="bill-totals-estimate-cell bill-totals-estimate-cell--rate"
+        title={updatedLabel}
+        aria-label={`USD rate, ${updatedLabel}`}
+      >
+        <div className="bill-totals-estimate-head">
+          <span className="bill-totals-estimate-badge" aria-hidden="true">
+            <Activity className="bill-totals-estimate-icon" />
+          </span>
           <span className="bill-totals-estimate-kicker">USD rate</span>
-          <strong className="bill-totals-estimate-pill">{rateLine}</strong>
+          <span className={`bill-totals-estimate-status is-${rateStatus}`}>
+            {rateStatus === 'loading' ? '…' : rateStatus === 'live' ? 'Live' : 'Off'}
+          </span>
         </div>
-      </div>
-      <div className="bill-totals-estimate-picker">
-        <span className="bill-totals-estimate-label">Totals in</span>
+        <p className="bill-totals-estimate-rate-line">{rateLine}</p>
+      </section>
+      <section className="bill-totals-estimate-cell bill-totals-estimate-cell--picker">
+        <span className="bill-totals-estimate-kicker">Totals in</span>
         <CompactCurrencyPicker value={currency} onChange={onCurrencyChange} />
-      </div>
+      </section>
     </div>
   );
 }
