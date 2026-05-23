@@ -27,6 +27,7 @@ import {
 } from '../../shared/currency/exchangeRates.js';
 import {
   getDateFormatOptions,
+  getDeviceTimeZone,
   getLocaleTag,
 } from '../../shared/currency/localeDefaults.js';
 import {
@@ -105,10 +106,12 @@ const getDueLabel = (daysUntil) => {
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat(getLocaleTag(), {
   month: 'long',
+  timeZone: getDeviceTimeZone(),
   year: 'numeric',
 });
 
 const WEEKDAY_FORMATTER = new Intl.DateTimeFormat(getLocaleTag(), {
+  timeZone: getDeviceTimeZone(),
   weekday: 'short',
 });
 
@@ -499,6 +502,7 @@ export default function BillsWorkspace() {
   const currentMonthKey = getTodayKey().slice(0, 7);
   const currentMonthLabel = new Intl.DateTimeFormat(getLocaleTag(), {
     month: 'long',
+    timeZone: getDeviceTimeZone(),
     year: 'numeric',
   }).format(new Date(`${currentMonthKey}-01T12:00:00`));
   const spentDisplayCurrency = shellPreferences.displayCurrency;
