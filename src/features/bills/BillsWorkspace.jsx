@@ -7,16 +7,21 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  CreditCard,
   Pencil,
+  PieChart,
   Plus,
   ReceiptText,
   Save,
   Server,
+  Tags,
   Trash2,
+  Wallet,
   X,
 } from 'lucide-react';
 import LiveDateTime from '../../components/layout/LiveDateTime.jsx';
 import {
+  convertToCurrency,
   getCachedExchangeRates,
   loadExchangeRates,
 } from '../../shared/currency/exchangeRates.js';
@@ -40,6 +45,21 @@ import {
   toBillDraft,
   updateBillFromDraft,
 } from './billStorage.js';
+import {
+  createEmptyBudgetDraft,
+  createEmptySpentDraft,
+  createSpentFromDraft,
+  loadCustomSpendCategories,
+  loadMonthlyBudget,
+  loadSpentEntries,
+  saveCustomSpendCategories,
+  saveMonthlyBudget,
+  saveSpentEntries,
+  SPEND_CATEGORIES,
+  normalizeSpendCategory,
+  toSpentDraft,
+  updateSpentFromDraft,
+} from './spentStorage.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -121,6 +141,12 @@ const getWeekdayLabels = () => Array.from({ length: 7 }, (_, index) => {
   const sunday = new Date(2026, 1, 1 + index, 12);
   return WEEKDAY_FORMATTER.format(sunday);
 });
+
+const getSpentCategories = (entry) => (
+  Array.isArray(entry.categories) && entry.categories.length > 0
+    ? entry.categories
+    : [entry.category].filter(Boolean)
+);
 
 function DateField({ id, label, value, onChange }) {
   const selectedDate = getDateFromKey(value);
@@ -324,24 +350,104 @@ function CurrencyField({ value, onChange }) {
   );
 }
 
+function CategoryField({
+  values,
+  categories,
+  customValue,
+  onCustomValueChange,
+  onAddCustomCategory,
+  onToggle,
+}) {
+  return (
+    <div className="category-field">
+      <span className="field-label">Where spent</span>
+      <div className="category-options" role="group" aria-label="Spending categories">
+        {categories.map((category) => (
+          <button
+            className={values.includes(category) ? 'is-selected' : ''}
+            type="button"
+            aria-pressed={values.includes(category)}
+            key={category}
+            onClick={() => onToggle(category)}
+          >
+            {category}
+          </button>
+        ))}
+      </div>
+      <div className="custom-category-row">
+        <input
+          value={customValue}
+          onChange={(event) => onCustomValueChange(event.target.value)}
+          placeholder="Add custom category"
+          aria-label="Custom spending category"
+        />
+        <button type="button" onClick={onAddCustomCategory}>
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function BillsWorkspace() {
-  const [bills, setBills] = useState(() => loadBills());
-  const [draft, setDraft] = useState(() => createEmptyBillDraft());
+  const [activeLedger, setActiveLedger] = useState('bills');
   const [shellPreferences, setShellPreferences] = useState(() => loadShellPreferences());
+  const [bills, setBills] = useState(() => loadBills());
+  const [draft, setDraft] = useState(() => ({
+    ...createEmptyBillDraft(),
+    currency: shellPreferences.displayCurrency,
+  }));
+  const [spentEntries, setSpentEntries] = useState(() => loadSpentEntries());
+  const [spentDraft, setSpentDraft] = useState(() => ({
+    ...createEmptySpentDraft(),
+    currency: shellPreferences.displayCurrency,
+  }));
+  const [customSpendCategories, setCustomSpendCategories] = useState(() => loadCustomSpendCategories());
+  const [customCategoryDraft, setCustomCategoryDraft] = useState('');
+  const [monthlyBudget, setMonthlyBudget] = useState(() => {
+    const budget = loadMonthlyBudget();
+    return budget.amount === ''
+      ? { ...budget, currency: shellPreferences.displayCurrency }
+      : budget;
+  });
+  const [budgetDraft, setBudgetDraft] = useState(() => {
+    const budget = loadMonthlyBudget();
+    const currency = budget.amount === '' ? shellPreferences.displayCurrency : budget.currency;
+    return {
+      amount: budget.amount === '' ? '' : String(budget.amount),
+      currency,
+    };
+  });
   const [ratesState, setRatesState] = useState({
     status: 'loading',
     rates: null,
     fetchedAt: null,
   });
   const [editingBillId, setEditingBillId] = useState('');
+  const [editingSpentId, setEditingSpentId] = useState('');
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [isSpentComposerOpen, setIsSpentComposerOpen] = useState(false);
   const [deleteBillId, setDeleteBillId] = useState('');
+  const [deleteSpentId, setDeleteSpentId] = useState('');
   const [formError, setFormError] = useState('');
+  const [spentFormError, setSpentFormError] = useState('');
 
   useEffect(() => {
     saveBills(bills);
     refreshBillNotifications();
   }, [bills]);
+
+  useEffect(() => {
+    saveSpentEntries(spentEntries);
+  }, [spentEntries]);
+
+  useEffect(() => {
+    saveCustomSpendCategories(customSpendCategories);
+  }, [customSpendCategories]);
+
+  useEffect(() => {
+    saveMonthlyBudget(monthlyBudget);
+  }, [monthlyBudget]);
 
   useEffect(() => {
     let cancelled = false;
@@ -390,10 +496,99 @@ export default function BillsWorkspace() {
     [bills, shellPreferences.displayCurrency, ratesState.rates],
   );
 
+  const currentMonthKey = getTodayKey().slice(0, 7);
+  const currentMonthLabel = new Intl.DateTimeFormat(getLocaleTag(), {
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${currentMonthKey}-01T12:00:00`));
+  const spentDisplayCurrency = shellPreferences.displayCurrency;
+
+  const spentSummary = useMemo(() => {
+    const monthEntries = spentEntries.filter((entry) => entry.spentDate.startsWith(currentMonthKey));
+    const categoryCounts = new Map();
+    let totalSpent = 0;
+    let hasConversionGap = false;
+
+    monthEntries.forEach((entry) => {
+      getSpentCategories(entry).forEach((category) => {
+        categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
+      });
+
+      const converted = convertToCurrency(
+        entry.amount,
+        entry.currency,
+        spentDisplayCurrency,
+        ratesState.rates,
+      );
+
+      if (converted === null) {
+        hasConversionGap = true;
+        return;
+      }
+
+      totalSpent += converted;
+    });
+
+    const budgetAmount = monthlyBudget.amount === ''
+      ? null
+      : convertToCurrency(
+        monthlyBudget.amount,
+        monthlyBudget.currency,
+        spentDisplayCurrency,
+        ratesState.rates,
+      );
+
+    const remaining = budgetAmount === null ? null : budgetAmount - totalSpent;
+    const categories = [...categoryCounts.entries()]
+      .map(([category, count]) => ({ category, count }))
+      .sort((left, right) => right.count - left.count || left.category.localeCompare(right.category));
+
+    return {
+      budgetAmount,
+      categories,
+      count: monthEntries.length,
+      hasConversionGap: hasConversionGap || (monthlyBudget.amount !== '' && budgetAmount === null),
+      overBudget: remaining === null ? null : Math.max(0, -remaining),
+      remaining: remaining === null ? null : Math.max(0, remaining),
+      totalSpent,
+    };
+  }, [
+    currentMonthKey,
+    monthlyBudget.amount,
+    monthlyBudget.currency,
+    ratesState.rates,
+    shellPreferences.displayCurrency,
+    spentDisplayCurrency,
+    spentEntries,
+  ]);
+
+  const spendCategories = useMemo(() => {
+    const seen = new Set();
+    return [
+      ...SPEND_CATEGORIES,
+      ...customSpendCategories,
+      ...spentEntries.flatMap((entry) => getSpentCategories(entry)),
+    ]
+      .filter((category) => {
+        const normalized = String(category || '').trim();
+        if (!normalized) return false;
+        const key = normalized.toLocaleLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }, [customSpendCategories, spentEntries]);
+
   const formatConvertedTotal = (amount) => {
     if (ratesState.status === 'loading') return '…';
     if (amount === null || ratesState.status === 'unavailable') return '—';
     return formatMoney(amount, shellPreferences.displayCurrency);
+  };
+
+  const formatSpentTotal = (amount) => {
+    if (ratesState.status === 'loading') return '…';
+    if (amount === null || ratesState.status === 'unavailable') return '—';
+    return formatMoney(amount, spentDisplayCurrency);
   };
 
   const updateDisplayCurrency = (displayCurrency) => {
@@ -402,6 +597,19 @@ export default function BillsWorkspace() {
       displayCurrency,
     });
     setShellPreferences(nextPreferences);
+
+    if (isComposerOpen && !editingBillId) {
+      setDraft((current) => ({ ...current, currency: displayCurrency }));
+    }
+
+    if (isSpentComposerOpen && !editingSpentId) {
+      setSpentDraft((current) => ({ ...current, currency: displayCurrency }));
+    }
+
+    if (monthlyBudget.amount === '') {
+      setMonthlyBudget((current) => ({ ...current, currency: displayCurrency }));
+      setBudgetDraft((current) => ({ ...current, currency: displayCurrency }));
+    }
   };
 
   const sortedBills = useMemo(() => [...bills].sort((left, right) => (
@@ -416,7 +624,10 @@ export default function BillsWorkspace() {
   };
 
   const resetComposer = () => {
-    setDraft(createEmptyBillDraft());
+    setDraft({
+      ...createEmptyBillDraft(),
+      currency: shellPreferences.displayCurrency,
+    });
     setEditingBillId('');
     setFormError('');
   };
@@ -474,6 +685,119 @@ export default function BillsWorkspace() {
     setDeleteBillId('');
   };
 
+  const sortedSpentEntries = useMemo(() => [...spentEntries].sort((left, right) => (
+    right.spentDate.localeCompare(left.spentDate) || left.title.localeCompare(right.title)
+  )), [spentEntries]);
+
+  const editingSpent = spentEntries.find((entry) => entry.id === editingSpentId);
+  const deleteSpentCandidate = spentEntries.find((entry) => entry.id === deleteSpentId);
+
+  const updateSpentDraft = (field, value) => {
+    if (spentFormError) setSpentFormError('');
+    setSpentDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const toggleSpentCategory = (category) => {
+    const normalized = normalizeSpendCategory(category);
+    if (!normalized) return;
+
+    updateSpentDraft('categories', spentDraft.categories.includes(normalized)
+      ? spentDraft.categories.filter((item) => item !== normalized)
+      : [...spentDraft.categories, normalized]);
+  };
+
+  const addCustomSpendCategory = () => {
+    const nextCategory = normalizeSpendCategory(customCategoryDraft);
+    if (!nextCategory) return;
+
+    setCustomSpendCategories((current) => {
+      if (current.some((category) => category.toLocaleLowerCase() === nextCategory.toLocaleLowerCase())
+        || SPEND_CATEGORIES.some((category) => category.toLocaleLowerCase() === nextCategory.toLocaleLowerCase())) {
+        return current;
+      }
+      return [...current, nextCategory];
+    });
+    updateSpentDraft('categories', spentDraft.categories.includes(nextCategory)
+      ? spentDraft.categories
+      : [...spentDraft.categories, nextCategory]);
+    setCustomCategoryDraft('');
+  };
+
+  const resetSpentComposer = () => {
+    setSpentDraft({
+      ...createEmptySpentDraft(),
+      currency: shellPreferences.displayCurrency,
+    });
+    setEditingSpentId('');
+    setSpentFormError('');
+    setCustomCategoryDraft('');
+  };
+
+  const openNewSpent = () => {
+    resetSpentComposer();
+    setIsSpentComposerOpen(true);
+  };
+
+  const closeSpentComposer = () => {
+    resetSpentComposer();
+    setIsSpentComposerOpen(false);
+  };
+
+  const submitSpent = (event) => {
+    event.preventDefault();
+
+    const nextEntry = editingSpent
+      ? updateSpentFromDraft(editingSpent, spentDraft)
+      : createSpentFromDraft(spentDraft);
+
+    if (!nextEntry) {
+      setSpentFormError('Title, amount, category, and date are required.');
+      return;
+    }
+
+    setSpentEntries((current) => editingSpent
+      ? current.map((entry) => (entry.id === editingSpent.id ? nextEntry : entry))
+      : [...current, nextEntry]);
+    closeSpentComposer();
+  };
+
+  const editSpent = (entry) => {
+    setEditingSpentId(entry.id);
+    setSpentDraft(toSpentDraft(entry));
+    setSpentFormError('');
+    setIsSpentComposerOpen(true);
+  };
+
+  const requestDeleteSpent = (entry) => {
+    setDeleteSpentId(entry.id);
+  };
+
+  const cancelDeleteSpent = () => {
+    setDeleteSpentId('');
+  };
+
+  const confirmDeleteSpent = () => {
+    if (!deleteSpentCandidate) return;
+
+    setSpentEntries((current) => current.filter((entry) => entry.id !== deleteSpentCandidate.id));
+    if (editingSpentId === deleteSpentCandidate.id) closeSpentComposer();
+    setDeleteSpentId('');
+  };
+
+  const updateBudgetDraft = (field, value) => {
+    setBudgetDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const submitBudget = (event) => {
+    event.preventDefault();
+    const nextBudget = saveMonthlyBudget(budgetDraft);
+    setMonthlyBudget(nextBudget);
+    setBudgetDraft({
+      amount: nextBudget.amount === '' ? '' : String(nextBudget.amount),
+      currency: nextBudget.currency,
+    });
+  };
+
   return (
     <section className="bill-workspace" aria-label="Recurring bill ledger">
       <LiveDateTime />
@@ -486,6 +810,27 @@ export default function BillsWorkspace() {
         usdRates={ratesState.rates}
       />
 
+      <nav className="ledger-switcher" aria-label="Money workspace">
+        <button
+          className={activeLedger === 'bills' ? 'is-active' : ''}
+          type="button"
+          onClick={() => setActiveLedger('bills')}
+        >
+          <ReceiptText aria-hidden="true" />
+          <span>Bills</span>
+        </button>
+        <button
+          className={activeLedger === 'spent' ? 'is-active' : ''}
+          type="button"
+          onClick={() => setActiveLedger('spent')}
+        >
+          <Wallet aria-hidden="true" />
+          <span>Spent</span>
+        </button>
+      </nav>
+
+      {activeLedger === 'bills' && (
+        <>
       <div className="ledger-intro">
         <div>
           <h1>Bills</h1>
@@ -578,6 +923,141 @@ export default function BillsWorkspace() {
           })}
         </section>
       </div>
+        </>
+      )}
+
+      {activeLedger === 'spent' && (
+        <div className="spent-workspace" aria-label="Monthly spending tracker">
+          <div className="ledger-intro spent-intro">
+            <div>
+              <h1>Spent</h1>
+            </div>
+            <button className="add-bill-command" type="button" onClick={openNewSpent}>
+              <Plus aria-hidden="true" />
+              Add spent
+            </button>
+            <dl className="ledger-marks" aria-label="Spending totals">
+              <div>
+                <dt>Monthly budget</dt>
+                <dd className="ledger-money">{formatSpentTotal(spentSummary.budgetAmount)}</dd>
+                <small>{currentMonthLabel}</small>
+              </div>
+              <div>
+                <dt>Total spent</dt>
+                <dd className="ledger-money">{formatSpentTotal(spentSummary.totalSpent)}</dd>
+                <small>{spentSummary.count} entries</small>
+              </div>
+              <div>
+                <dt>Total left</dt>
+                <dd className="ledger-money">{formatSpentTotal(spentSummary.remaining)}</dd>
+              </div>
+              <div>
+                <dt>Over budget</dt>
+                <dd className={`ledger-money${spentSummary.overBudget > 0 ? ' is-negative' : ''}`}>
+                  {formatSpentTotal(spentSummary.overBudget)}
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <section className="budget-panel" aria-label="Monthly budget">
+            <div className="rail-head">
+              <PieChart aria-hidden="true" />
+              <h2>Monthly budget</h2>
+            </div>
+            <form className="budget-form" onSubmit={submitBudget}>
+              <label>
+                Budget amount
+                <input
+                  min="0"
+                  step="0.01"
+                  type="number"
+                  inputMode="decimal"
+                  value={budgetDraft.amount}
+                  onChange={(event) => updateBudgetDraft('amount', event.target.value)}
+                  placeholder="1500"
+                />
+              </label>
+              <CurrencyField
+                value={budgetDraft.currency}
+                onChange={(value) => updateBudgetDraft('currency', value)}
+              />
+              <button className="save-bill-btn" type="submit">
+                <Save aria-hidden="true" />
+                Save budget
+              </button>
+            </form>
+          </section>
+
+          <div className="spent-layout">
+            <section className="spent-list" aria-label="Spent entries">
+              <div className="rail-head">
+                <CreditCard aria-hidden="true" />
+                <h2>Where money went</h2>
+              </div>
+
+              {sortedSpentEntries.length === 0 ? (
+                <div className="rail-empty">
+                  <Wallet aria-hidden="true" />
+                  <strong>No spending added yet.</strong>
+                </div>
+              ) : sortedSpentEntries.map((entry) => (
+                <article className="spent-card" key={entry.id}>
+                  <div className="spent-card-main">
+                    <div className="spent-card-title">
+                      <div className="spent-card-tags">
+                        {getSpentCategories(entry).map((category) => (
+                          <span key={category}>{category}</span>
+                        ))}
+                      </div>
+                      <h3>{entry.title}</h3>
+                    </div>
+                    <p className={entry.details ? '' : 'is-empty'}>
+                      {entry.details || 'No details added.'}
+                    </p>
+                    <time dateTime={entry.spentDate}>{formatDate(entry.spentDate)}</time>
+                  </div>
+                  <div className="spent-card-side">
+                    <div className="spent-card-amount">
+                      <strong>{formatPrice({ price: entry.amount, currency: entry.currency })}</strong>
+                      <span>{entry.currency}</span>
+                    </div>
+                    <div className="ticket-tools">
+                      <button type="button" onClick={() => editSpent(entry)} aria-label={`Edit ${entry.title}`} title="Edit spent">
+                        <Pencil aria-hidden="true" />
+                        <span>Edit</span>
+                      </button>
+                      <button type="button" onClick={() => requestDeleteSpent(entry)} aria-label={`Delete ${entry.title}`} title="Delete spent">
+                        <Trash2 aria-hidden="true" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </section>
+
+            <aside className="category-panel" aria-label="Spending by category">
+              <div className="rail-head">
+                <Tags aria-hidden="true" />
+                <h2>Categories</h2>
+              </div>
+              {spentSummary.categories.length === 0 ? (
+                <p className="category-empty">No categories used in {currentMonthLabel}.</p>
+              ) : (
+                <div className="category-total-list">
+                  {spentSummary.categories.map((item) => (
+                    <div className="category-total-row" key={item.category}>
+                      <span>{item.category}</span>
+                      <strong>{item.count}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </aside>
+          </div>
+        </div>
+      )}
 
       {isComposerOpen && (
         <div className="composer-backdrop">
@@ -677,6 +1157,109 @@ export default function BillsWorkspace() {
             <div className="delete-actions">
               <button type="button" onClick={cancelDeleteBill}>Cancel</button>
               <button type="button" onClick={confirmDeleteBill}>Delete bill</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {isSpentComposerOpen && (
+        <div className="composer-backdrop">
+          <section className="composer-dialog" role="dialog" aria-modal="true" aria-labelledby="spent-composer-title">
+            <form className="bill-composer spent-composer" onSubmit={submitSpent}>
+              <div className="composer-head">
+                <div>
+                  <h2 id="spent-composer-title">{editingSpent ? 'Edit spent' : 'Add spent'}</h2>
+                </div>
+                <button className="ghost-icon-btn" type="button" onClick={closeSpentComposer} aria-label="Close spent form" title="Close">
+                  <X aria-hidden="true" />
+                </button>
+              </div>
+
+              <label>
+                Title
+                <input
+                  value={spentDraft.title}
+                  onChange={(event) => updateSpentDraft('title', event.target.value)}
+                  placeholder="Groceries, taxi, AWS invoice"
+                  required
+                />
+              </label>
+
+              <CategoryField
+                values={spentDraft.categories}
+                categories={spendCategories}
+                customValue={customCategoryDraft}
+                onCustomValueChange={setCustomCategoryDraft}
+                onAddCustomCategory={addCustomSpendCategory}
+                onToggle={toggleSpentCategory}
+              />
+
+              <label className="bill-details-field">
+                Details
+                <div className="bill-details-shell">
+                  <textarea
+                    className="bill-details-input"
+                    value={spentDraft.details}
+                    onChange={(event) => updateSpentDraft('details', event.target.value)}
+                    placeholder="Where and why this money was spent."
+                    rows="4"
+                    spellCheck="true"
+                  />
+                </div>
+              </label>
+
+              <div className="price-row">
+                <label>
+                  Amount
+                  <input
+                    min="0"
+                    step="0.01"
+                    type="number"
+                    inputMode="decimal"
+                    value={spentDraft.amount}
+                    onChange={(event) => updateSpentDraft('amount', event.target.value)}
+                    placeholder="24.99"
+                    required
+                  />
+                </label>
+                <CurrencyField
+                  value={spentDraft.currency}
+                  onChange={(value) => updateSpentDraft('currency', value)}
+                />
+              </div>
+
+              <DateField
+                id="spent-date"
+                label="Date"
+                value={spentDraft.spentDate}
+                onChange={(value) => updateSpentDraft('spentDate', value)}
+              />
+
+              {spentFormError && <p className="form-error" role="alert">{spentFormError}</p>}
+
+              <button className="save-bill-btn" type="submit">
+                {editingSpent ? <Save aria-hidden="true" /> : <CreditCard aria-hidden="true" />}
+                {editingSpent ? 'Save changes' : 'Save spent'}
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {deleteSpentCandidate && (
+        <div className="composer-backdrop">
+          <section className="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-spent-title">
+            <button className="ghost-icon-btn delete-close-btn" type="button" onClick={cancelDeleteSpent} aria-label="Close delete warning" title="Close">
+              <X aria-hidden="true" />
+            </button>
+            <div className="delete-mark">
+              <Trash2 aria-hidden="true" />
+            </div>
+            <h2 id="delete-spent-title">Delete spent?</h2>
+            <p><strong>{deleteSpentCandidate.title}</strong> will be removed from your spending history.</p>
+            <div className="delete-actions">
+              <button type="button" onClick={cancelDeleteSpent}>Cancel</button>
+              <button type="button" onClick={confirmDeleteSpent}>Delete spent</button>
             </div>
           </section>
         </div>
