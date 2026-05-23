@@ -27,6 +27,12 @@ jobs:
         distribution: 'zulu'
         java-version: '21'
 
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: wrapper
+        cache-read-only: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
+
     - name: Automatically Install Dependencies
       run: npm install
 
@@ -56,7 +62,22 @@ jobs:
       working-directory: ./android
       run: |
         chmod +x ./gradlew
-        ./gradlew clean assembleRelease
+        build_ok=0
+        for attempt in 1 2 3; do
+          echo "Gradle assembleRelease attempt ${attempt}..."
+          if ./gradlew clean assembleRelease --no-daemon; then
+            build_ok=1
+            break
+          fi
+          if [ "${attempt}" -lt 3 ]; then
+            echo "Build failed. Waiting 45s before retry (Maven may be rate-limited)..."
+            sleep 45
+          fi
+        done
+        if [ "${build_ok}" -ne 1 ]; then
+          echo "Gradle build failed after 3 attempts."
+          exit 1
+        fi
         mv ./app/build/outputs/apk/release/app-release.apk "./app/build/outputs/apk/release/${APK_FILE_NAME}"
 
     - name: Upload Signed APK Artifact

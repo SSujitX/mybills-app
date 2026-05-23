@@ -1,9 +1,15 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
-    
+
     repositories {
         google()
+        gradlePluginPortal()
+        // Google-hosted Maven Central mirror (avoids repo.maven.apache.org 429 rate limits on CI).
+        maven {
+            name = "MavenCentralGoogleMirror"
+            url = uri("https://maven-central.storage-download.googleapis.com/maven2/")
+        }
         mavenCentral()
     }
     dependencies {
@@ -20,6 +26,11 @@ apply from: "variables.gradle"
 allprojects {
     repositories {
         google()
+        gradlePluginPortal()
+        maven {
+            name = "MavenCentralGoogleMirror"
+            url = uri("https://maven-central.storage-download.googleapis.com/maven2/")
+        }
         mavenCentral()
     }
 }

@@ -23,6 +23,9 @@ out/
 .gradle/
 build/
 
+# Kotlin compiler daemon session files (Android Studio / local builds)
+.kotlin/
+
 # Local configuration file (sdk path, etc)
 local.properties
 
