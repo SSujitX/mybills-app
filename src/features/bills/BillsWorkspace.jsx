@@ -20,23 +20,28 @@ import {
   X,
 } from 'lucide-react';
 import LiveDateTime from '../../components/layout/LiveDateTime.jsx';
-import {
-  convertToCurrency,
-  getCachedExchangeRates,
-  loadExchangeRates,
-} from '../../shared/currency/exchangeRates.js';
+import BillTotalsEstimateBar from './BillTotalsEstimateBar.jsx';
+import LedgerMoneyChips from './LedgerMoneyChips.jsx';
+import { useExchangeRates } from './useExchangeRates.js';
 import {
   getDateFormatOptions,
   getDeviceTimeZone,
+  getDefaultCurrency,
   getLocaleTag,
 } from '../../shared/currency/localeDefaults.js';
 import {
   loadShellPreferences,
   saveShellPreferences,
 } from '../../shared/storage/shellPreferences.js';
-import DisplayCurrencyBar from './DisplayCurrencyBar.jsx';
 import { refreshBillNotifications } from './billNotifications.js';
-import { formatMoney, summarizeBillMoney } from './billTotals.js';
+import {
+  formatConvertedTotal,
+  formatMoney,
+  formatMoneyByCurrency,
+  summarizeBillMoneyByCurrency,
+  summarizeBillMoneyInCurrency,
+  summarizeSpentMonth,
+} from './billTotals.js';
 import {
   BILL_CURRENCIES,
   createBillFromDraft,
@@ -82,6 +87,12 @@ const formatDate = (dateKey) => new Intl.DateTimeFormat(
   getLocaleTag(),
   getDateFormatOptions(),
 ).format(new Date(`${dateKey}T12:00:00`));
+
+const formatTicketDate = (dateKey) => new Intl.DateTimeFormat(getLocaleTag(), {
+  month: 'short',
+  day: 'numeric',
+  year: '2-digit',
+}).format(new Date(`${dateKey}T12:00:00`));
 
 const formatPrice = (bill) => new Intl.NumberFormat(undefined, {
   style: 'currency',
@@ -398,33 +409,22 @@ export default function BillsWorkspace() {
   const [bills, setBills] = useState(() => loadBills());
   const [draft, setDraft] = useState(() => ({
     ...createEmptyBillDraft(),
-    currency: shellPreferences.displayCurrency,
+    currency: shellPreferences.lastBillCurrency,
   }));
   const [spentEntries, setSpentEntries] = useState(() => loadSpentEntries());
   const [spentDraft, setSpentDraft] = useState(() => ({
     ...createEmptySpentDraft(),
-    currency: shellPreferences.displayCurrency,
+    currency: shellPreferences.lastSpentCurrency,
   }));
   const [customSpendCategories, setCustomSpendCategories] = useState(() => loadCustomSpendCategories());
   const [customCategoryDraft, setCustomCategoryDraft] = useState('');
-  const [monthlyBudget, setMonthlyBudget] = useState(() => {
-    const budget = loadMonthlyBudget();
-    return budget.amount === ''
-      ? { ...budget, currency: shellPreferences.displayCurrency }
-      : budget;
-  });
+  const [monthlyBudget, setMonthlyBudget] = useState(() => loadMonthlyBudget());
   const [budgetDraft, setBudgetDraft] = useState(() => {
     const budget = loadMonthlyBudget();
-    const currency = budget.amount === '' ? shellPreferences.displayCurrency : budget.currency;
     return {
       amount: budget.amount === '' ? '' : String(budget.amount),
-      currency,
+      currency: budget.currency || getDefaultCurrency(),
     };
-  });
-  const [ratesState, setRatesState] = useState({
-    status: 'loading',
-    rates: null,
-    fetchedAt: null,
   });
   const [editingBillId, setEditingBillId] = useState('');
   const [editingSpentId, setEditingSpentId] = useState('');
@@ -434,6 +434,7 @@ export default function BillsWorkspace() {
   const [deleteSpentId, setDeleteSpentId] = useState('');
   const [formError, setFormError] = useState('');
   const [spentFormError, setSpentFormError] = useState('');
+  const ratesState = useExchangeRates();
 
   useEffect(() => {
     saveBills(bills);
@@ -452,52 +453,21 @@ export default function BillsWorkspace() {
     saveMonthlyBudget(monthlyBudget);
   }, [monthlyBudget]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const billTotalsCurrency = shellPreferences.billTotalsCurrency;
 
-    const refreshRates = () => {
-      const cached = getCachedExchangeRates();
-      if (cached) {
-        setRatesState({
-          status: 'loading',
-          rates: cached.rates,
-          fetchedAt: cached.fetchedAt,
-        });
-      }
-
-      loadExchangeRates().then((result) => {
-        if (cancelled) return;
-
-        setRatesState({
-          status: result.status,
-          rates: result.rates,
-          fetchedAt: result.fetchedAt,
-        });
-      });
-    };
-
-    refreshRates();
-
-    const refreshOnVisible = () => {
-      if (document.visibilityState === 'visible') refreshRates();
-    };
-
-    document.addEventListener('visibilitychange', refreshOnVisible);
-
-    return () => {
-      cancelled = true;
-      document.removeEventListener('visibilitychange', refreshOnVisible);
-    };
-  }, []);
-
-  const moneySummary = useMemo(
-    () => summarizeBillMoney(
+  const moneySummary = useMemo(() => {
+    const byCurrency = summarizeBillMoneyByCurrency(bills);
+    const estimated = summarizeBillMoneyInCurrency(
       bills,
-      shellPreferences.displayCurrency,
+      billTotalsCurrency,
       ratesState.rates,
-    ),
-    [bills, shellPreferences.displayCurrency, ratesState.rates],
-  );
+    );
+
+    return {
+      ...byCurrency,
+      estimated,
+    };
+  }, [billTotalsCurrency, bills, ratesState.rates]);
 
   const currentMonthKey = getTodayKey().slice(0, 7);
   const currentMonthLabel = new Intl.DateTimeFormat(getLocaleTag(), {
@@ -505,66 +475,10 @@ export default function BillsWorkspace() {
     timeZone: getDeviceTimeZone(),
     year: 'numeric',
   }).format(new Date(`${currentMonthKey}-01T12:00:00`));
-  const spentDisplayCurrency = shellPreferences.displayCurrency;
-
-  const spentSummary = useMemo(() => {
-    const monthEntries = spentEntries.filter((entry) => entry.spentDate.startsWith(currentMonthKey));
-    const categoryCounts = new Map();
-    let totalSpent = 0;
-    let hasConversionGap = false;
-
-    monthEntries.forEach((entry) => {
-      getSpentCategories(entry).forEach((category) => {
-        categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
-      });
-
-      const converted = convertToCurrency(
-        entry.amount,
-        entry.currency,
-        spentDisplayCurrency,
-        ratesState.rates,
-      );
-
-      if (converted === null) {
-        hasConversionGap = true;
-        return;
-      }
-
-      totalSpent += converted;
-    });
-
-    const budgetAmount = monthlyBudget.amount === ''
-      ? null
-      : convertToCurrency(
-        monthlyBudget.amount,
-        monthlyBudget.currency,
-        spentDisplayCurrency,
-        ratesState.rates,
-      );
-
-    const remaining = budgetAmount === null ? null : budgetAmount - totalSpent;
-    const categories = [...categoryCounts.entries()]
-      .map(([category, count]) => ({ category, count }))
-      .sort((left, right) => right.count - left.count || left.category.localeCompare(right.category));
-
-    return {
-      budgetAmount,
-      categories,
-      count: monthEntries.length,
-      hasConversionGap: hasConversionGap || (monthlyBudget.amount !== '' && budgetAmount === null),
-      overBudget: remaining === null ? null : Math.max(0, -remaining),
-      remaining: remaining === null ? null : Math.max(0, remaining),
-      totalSpent,
-    };
-  }, [
-    currentMonthKey,
-    monthlyBudget.amount,
-    monthlyBudget.currency,
-    ratesState.rates,
-    shellPreferences.displayCurrency,
-    spentDisplayCurrency,
-    spentEntries,
-  ]);
+  const spentSummary = useMemo(
+    () => summarizeSpentMonth(spentEntries, currentMonthKey, monthlyBudget),
+    [currentMonthKey, monthlyBudget, spentEntries],
+  );
 
   const spendCategories = useMemo(() => {
     const seen = new Set();
@@ -583,37 +497,25 @@ export default function BillsWorkspace() {
       });
   }, [customSpendCategories, spentEntries]);
 
-  const formatConvertedTotal = (amount) => {
-    if (ratesState.status === 'loading') return '…';
-    if (amount === null || ratesState.status === 'unavailable') return '—';
-    return formatMoney(amount, shellPreferences.displayCurrency);
+  const rememberBillCurrency = (currency) => {
+    setShellPreferences((current) => saveShellPreferences({
+      ...current,
+      lastBillCurrency: currency,
+    }));
   };
 
-  const formatSpentTotal = (amount) => {
-    if (ratesState.status === 'loading') return '…';
-    if (amount === null || ratesState.status === 'unavailable') return '—';
-    return formatMoney(amount, spentDisplayCurrency);
+  const rememberSpentCurrency = (currency) => {
+    setShellPreferences((current) => saveShellPreferences({
+      ...current,
+      lastSpentCurrency: currency,
+    }));
   };
 
-  const updateDisplayCurrency = (displayCurrency) => {
-    const nextPreferences = saveShellPreferences({
-      ...shellPreferences,
-      displayCurrency,
-    });
-    setShellPreferences(nextPreferences);
-
-    if (isComposerOpen && !editingBillId) {
-      setDraft((current) => ({ ...current, currency: displayCurrency }));
-    }
-
-    if (isSpentComposerOpen && !editingSpentId) {
-      setSpentDraft((current) => ({ ...current, currency: displayCurrency }));
-    }
-
-    if (monthlyBudget.amount === '') {
-      setMonthlyBudget((current) => ({ ...current, currency: displayCurrency }));
-      setBudgetDraft((current) => ({ ...current, currency: displayCurrency }));
-    }
+  const updateBillTotalsCurrency = (currency) => {
+    setShellPreferences((current) => saveShellPreferences({
+      ...current,
+      billTotalsCurrency: currency,
+    }));
   };
 
   const sortedBills = useMemo(() => [...bills].sort((left, right) => (
@@ -630,7 +532,7 @@ export default function BillsWorkspace() {
   const resetComposer = () => {
     setDraft({
       ...createEmptyBillDraft(),
-      currency: shellPreferences.displayCurrency,
+      currency: shellPreferences.lastBillCurrency,
     });
     setEditingBillId('');
     setFormError('');
@@ -661,6 +563,7 @@ export default function BillsWorkspace() {
     setBills((current) => editingBill
       ? current.map((bill) => (bill.id === editingBill.id ? nextBill : bill))
       : [...current, nextBill]);
+    rememberBillCurrency(nextBill.currency);
     closeComposer();
   };
 
@@ -730,7 +633,7 @@ export default function BillsWorkspace() {
   const resetSpentComposer = () => {
     setSpentDraft({
       ...createEmptySpentDraft(),
-      currency: shellPreferences.displayCurrency,
+      currency: shellPreferences.lastSpentCurrency,
     });
     setEditingSpentId('');
     setSpentFormError('');
@@ -762,6 +665,7 @@ export default function BillsWorkspace() {
     setSpentEntries((current) => editingSpent
       ? current.map((entry) => (entry.id === editingSpent.id ? nextEntry : entry))
       : [...current, nextEntry]);
+    rememberSpentCurrency(nextEntry.currency);
     closeSpentComposer();
   };
 
@@ -806,14 +710,6 @@ export default function BillsWorkspace() {
     <section className="bill-workspace" aria-label="Recurring bill ledger">
       <LiveDateTime />
 
-      <DisplayCurrencyBar
-        value={shellPreferences.displayCurrency}
-        onChange={updateDisplayCurrency}
-        ratesStatus={ratesState.status}
-        ratesUpdatedAt={ratesState.fetchedAt}
-        usdRates={ratesState.rates}
-      />
-
       <nav className="ledger-switcher" aria-label="Money workspace">
         <button
           className={activeLedger === 'bills' ? 'is-active' : ''}
@@ -843,24 +739,57 @@ export default function BillsWorkspace() {
           <Plus aria-hidden="true" />
           Add bill
         </button>
-        <dl className="ledger-marks" aria-label="Bill totals">
-          <div>
+        <BillTotalsEstimateBar
+          ratesState={ratesState}
+          currency={billTotalsCurrency}
+          onCurrencyChange={updateBillTotalsCurrency}
+        />
+        <dl className="ledger-marks ledger-marks--bills" aria-label="Bill totals">
+          <div className="ledger-mark ledger-mark-count">
             <dt>Total bills</dt>
             <dd>{moneySummary.count}</dd>
           </div>
-          <div>
+          <div className="ledger-mark ledger-mark-value">
             <dt>Total bill value</dt>
-            <dd className="ledger-money">{formatConvertedTotal(moneySummary.totalAll)}</dd>
+            <dd className="ledger-money ledger-money-hero">
+              {formatConvertedTotal(
+                moneySummary.estimated.totalAll,
+                billTotalsCurrency,
+                ratesState.status,
+                moneySummary.estimated.hasConversionGap,
+              )}
+            </dd>
+            <LedgerMoneyChips totalsByCurrency={moneySummary.totalAll} />
           </div>
-          <div>
+          <div className="ledger-mark ledger-mark-due">
             <dt>Total bill due</dt>
-            <dd className="ledger-money">{formatConvertedTotal(moneySummary.totalDueSoon)}</dd>
-            <small>{moneySummary.dueSoonCount} due soon</small>
+            <dd className="ledger-money">
+              {formatConvertedTotal(
+                moneySummary.estimated.totalDueSoon,
+                billTotalsCurrency,
+                ratesState.status,
+                moneySummary.estimated.hasConversionGap,
+              )}
+            </dd>
+            <small className="ledger-mark-meta">{moneySummary.dueSoonCount} due soon</small>
+            {moneySummary.dueSoonCount > 0 && (
+              <LedgerMoneyChips totalsByCurrency={moneySummary.totalDueSoon} kicker="Original due" />
+            )}
           </div>
-          <div>
+          <div className="ledger-mark ledger-mark-expired">
             <dt>Total expired</dt>
-            <dd className="ledger-money">{formatConvertedTotal(moneySummary.totalExpired)}</dd>
-            <small>{moneySummary.expiredCount} expired</small>
+            <dd className="ledger-money">
+              {formatConvertedTotal(
+                moneySummary.estimated.totalExpired,
+                billTotalsCurrency,
+                ratesState.status,
+                moneySummary.estimated.hasConversionGap,
+              )}
+            </dd>
+            <small className="ledger-mark-meta">{moneySummary.expiredCount} expired</small>
+            {moneySummary.expiredCount > 0 && (
+              <LedgerMoneyChips totalsByCurrency={moneySummary.totalExpired} kicker="Original expired" />
+            )}
           </div>
         </dl>
       </div>
@@ -894,21 +823,24 @@ export default function BillsWorkspace() {
                 </div>
                 <div className="ticket-side">
                   <dl className="ticket-facts">
-                    <div>
+                    <div className="ticket-fact ticket-fact-amount">
                       <dt>Amount</dt>
-                      <dd>{formatPrice(bill)}</dd>
+                      <dd className="ticket-fact-value">{formatPrice(bill)}</dd>
                     </div>
-                    <div>
-                      <dt>Currency</dt>
-                      <dd className="ticket-fact-currency">{bill.currency}</dd>
-                    </div>
-                    <div>
-                      <dt>Purchased</dt>
-                      <dd>{formatDate(bill.boughtDate)}</dd>
-                    </div>
-                    <div>
-                      <dt>Expires</dt>
-                      <dd className="ticket-fact-expiry">{formatDate(bill.expiryDate)}</dd>
+                    <div className="ticket-fact-dates">
+                      <div className="ticket-fact ticket-fact-bought">
+                        <dt>Bought</dt>
+                        <dd title={formatDate(bill.boughtDate)}>{formatTicketDate(bill.boughtDate)}</dd>
+                      </div>
+                      <div className="ticket-fact ticket-fact-expiry-wrap">
+                        <dt>Expires</dt>
+                        <dd
+                          className="ticket-fact-expiry"
+                          title={formatDate(bill.expiryDate)}
+                        >
+                          {formatTicketDate(bill.expiryDate)}
+                        </dd>
+                      </div>
                     </div>
                   </dl>
                   <div className="ticket-tools">
@@ -943,25 +875,45 @@ export default function BillsWorkspace() {
             <dl className="ledger-marks" aria-label="Spending totals">
               <div>
                 <dt>Monthly budget</dt>
-                <dd className="ledger-money">{formatSpentTotal(spentSummary.budgetAmount)}</dd>
+                <dd className="ledger-money">
+                  {spentSummary.budgetAmount === null
+                    ? '—'
+                    : formatMoney(spentSummary.budgetAmount, spentSummary.budgetCurrency)}
+                </dd>
                 <small>{currentMonthLabel}</small>
               </div>
               <div>
                 <dt>Total spent</dt>
-                <dd className="ledger-money">{formatSpentTotal(spentSummary.totalSpent)}</dd>
+                <dd className="ledger-money ledger-money-multi">
+                  {formatMoneyByCurrency(spentSummary.spentByCurrency)}
+                </dd>
                 <small>{spentSummary.count} entries</small>
               </div>
               <div>
-                <dt>Total left</dt>
-                <dd className="ledger-money">{formatSpentTotal(spentSummary.remaining)}</dd>
+                <dt>Left in budget</dt>
+                <dd className="ledger-money">
+                  {spentSummary.remaining === null
+                    ? '—'
+                    : formatMoney(spentSummary.remaining, spentSummary.budgetCurrency)}
+                </dd>
+                <small>in {spentSummary.budgetCurrency}</small>
               </div>
               <div>
                 <dt>Over budget</dt>
                 <dd className={`ledger-money${spentSummary.overBudget > 0 ? ' is-negative' : ''}`}>
-                  {formatSpentTotal(spentSummary.overBudget)}
+                  {spentSummary.overBudget === null
+                    ? '—'
+                    : formatMoney(spentSummary.overBudget, spentSummary.budgetCurrency)}
                 </dd>
               </div>
             </dl>
+            {spentSummary.otherSpent.length > 0 && (
+              <p className="ledger-currency-note">
+                Other currencies this month: {spentSummary.otherSpent
+                  .map(([currency, amount]) => formatMoney(amount, currency))
+                  .join(' · ')}
+              </p>
+            )}
           </div>
 
           <section className="budget-panel" aria-label="Monthly budget">
@@ -1024,7 +976,6 @@ export default function BillsWorkspace() {
                   <div className="spent-card-side">
                     <div className="spent-card-amount">
                       <strong>{formatPrice({ price: entry.amount, currency: entry.currency })}</strong>
-                      <span>{entry.currency}</span>
                     </div>
                     <div className="ticket-tools">
                       <button type="button" onClick={() => editSpent(entry)} aria-label={`Edit ${entry.title}`} title="Edit spent">
