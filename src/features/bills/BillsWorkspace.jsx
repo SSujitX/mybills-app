@@ -37,7 +37,7 @@ import { refreshBillNotifications } from './billNotifications.js';
 import {
   formatConvertedTotal,
   formatMoney,
-  formatMoneyByCurrency,
+  getSpentHeroDisplay,
   summarizeBillMoneyByCurrency,
   summarizeBillMoneyInCurrency,
   summarizeSpentMonth,
@@ -479,6 +479,16 @@ export default function BillsWorkspace() {
     () => summarizeSpentMonth(spentEntries, currentMonthKey, monthlyBudget),
     [currentMonthKey, monthlyBudget, spentEntries],
   );
+  const spentHeroDisplay = useMemo(
+    () => getSpentHeroDisplay(spentSummary),
+    [spentSummary],
+  );
+  const showSpentCurrencyChips = useMemo(() => {
+    const currencyCount = Object.values(spentSummary.spentByCurrency)
+      .filter((amount) => Number.isFinite(amount) && amount > 0)
+      .length;
+    return currencyCount > 1 || spentHeroDisplay.chipsOnly;
+  }, [spentHeroDisplay.chipsOnly, spentSummary.spentByCurrency]);
 
   const spendCategories = useMemo(() => {
     const seen = new Set();
@@ -872,48 +882,60 @@ export default function BillsWorkspace() {
               <Plus aria-hidden="true" />
               Add spent
             </button>
-            <dl className="ledger-marks" aria-label="Spending totals">
-              <div>
+            <dl className="ledger-marks ledger-marks--spent" aria-label="Spending totals">
+              <div
+                className={`ledger-mark ledger-mark-spent-hero${spentHeroDisplay.chipsOnly ? ' is-chips-only' : ''}`}
+              >
+                <dt>Total spent</dt>
+                {!spentHeroDisplay.chipsOnly && (
+                  <dd className="ledger-money ledger-money-hero">{spentHeroDisplay.text}</dd>
+                )}
+                {showSpentCurrencyChips && (
+                  <LedgerMoneyChips
+                    totalsByCurrency={spentSummary.spentByCurrency}
+                    kicker="This month"
+                    variant="spent"
+                  />
+                )}
+                {spentHeroDisplay.hint && (
+                  <small className="ledger-mark-hint">{spentHeroDisplay.hint}</small>
+                )}
+                <small className="ledger-mark-meta">{spentSummary.count} entries</small>
+              </div>
+              <div className="ledger-mark ledger-mark-budget">
                 <dt>Monthly budget</dt>
                 <dd className="ledger-money">
                   {spentSummary.budgetAmount === null
                     ? '—'
                     : formatMoney(spentSummary.budgetAmount, spentSummary.budgetCurrency)}
                 </dd>
-                <small>{currentMonthLabel}</small>
+                <small className="ledger-mark-meta">{currentMonthLabel}</small>
               </div>
-              <div>
-                <dt>Total spent</dt>
-                <dd className="ledger-money ledger-money-multi">
-                  {formatMoneyByCurrency(spentSummary.spentByCurrency)}
-                </dd>
-                <small>{spentSummary.count} entries</small>
-              </div>
-              <div>
+              <div className="ledger-mark ledger-mark-remaining">
                 <dt>Left in budget</dt>
-                <dd className="ledger-money">
+                <dd className="ledger-money ledger-money-positive">
                   {spentSummary.remaining === null
                     ? '—'
                     : formatMoney(spentSummary.remaining, spentSummary.budgetCurrency)}
                 </dd>
-                <small>in {spentSummary.budgetCurrency}</small>
+                <small className="ledger-mark-meta">
+                  {spentSummary.budgetAmount === null
+                    ? 'Set a budget'
+                    : `in ${spentSummary.budgetCurrency}`}
+                </small>
               </div>
-              <div>
+              <div className="ledger-mark ledger-mark-over">
                 <dt>Over budget</dt>
                 <dd className={`ledger-money${spentSummary.overBudget > 0 ? ' is-negative' : ''}`}>
                   {spentSummary.overBudget === null
                     ? '—'
                     : formatMoney(spentSummary.overBudget, spentSummary.budgetCurrency)}
                 </dd>
+                <small className="ledger-mark-meta">
+                  {spentSummary.overBudget > 0 ? 'Over limit' : 'On track'}
+                </small>
               </div>
             </dl>
-            {spentSummary.otherSpent.length > 0 && (
-              <p className="ledger-currency-note">
-                Other currencies this month: {spentSummary.otherSpent
-                  .map(([currency, amount]) => formatMoney(amount, currency))
-                  .join(' · ')}
-              </p>
-            )}
           </div>
 
           <section className="budget-panel" aria-label="Monthly budget">
