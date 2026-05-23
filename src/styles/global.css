@@ -2886,123 +2886,126 @@ button:focus-visible {
 }
 
 @media (max-width: 720px) {
-  .ledger-marks--bills {
-    gap: 3px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: auto auto;
+  .ledger-marks--bills,
+  .ledger-marks--spent {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    overflow: visible;
   }
 
   .ledger-marks--bills .ledger-mark-value {
-    gap: 0.5rem;
-    grid-column: 1 / -1;
-    grid-row: 1;
-    min-height: 0;
-    padding: 0.85rem 0.9rem;
-  }
-
-  .ledger-marks--bills .ledger-mark-value .ledger-money-hero {
-    font-size: clamp(1.35rem, 6.2vw, 1.9rem);
+    order: 1;
   }
 
   .ledger-marks--bills .ledger-mark-count {
-    grid-column: 1;
-    grid-row: 2;
+    order: 2;
   }
 
   .ledger-marks--bills .ledger-mark-due {
-    grid-column: 2;
-    grid-row: 2;
+    order: 3;
   }
 
   .ledger-marks--bills .ledger-mark-expired {
-    grid-column: 3;
-    grid-row: 2;
+    order: 4;
   }
 
-  .ledger-marks--bills .ledger-mark-count,
-  .ledger-marks--bills .ledger-mark-due,
-  .ledger-marks--bills .ledger-mark-expired {
-    align-content: center;
-    justify-items: center;
-    min-height: 4.35rem;
-    padding: 0.62rem 0.5rem;
-    text-align: center;
-  }
-
-  .ledger-marks--bills .ledger-mark-count dd {
-    font-size: clamp(1.3rem, 5.5vw, 1.6rem);
-  }
-
-  .ledger-marks--bills .ledger-mark-due dd.ledger-money,
-  .ledger-marks--bills .ledger-mark-expired dd.ledger-money {
-    font-size: clamp(0.82rem, 3.6vw, 1rem);
-  }
-
-  .ledger-marks--bills .ledger-mark-meta {
-    font-size: 0.66rem;
-  }
-
-  .ledger-marks--bills .ledger-mark-due .ledger-money-chips,
-  .ledger-marks--bills .ledger-mark-expired .ledger-money-chips {
-    display: none;
-  }
-
-  .ledger-marks--spent {
-    gap: 3px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: auto auto;
-  }
-
+  .ledger-marks--bills .ledger-mark-value,
   .ledger-marks--spent .ledger-mark-spent-hero {
+    display: grid;
     gap: 0.5rem;
-    grid-column: 1 / -1;
-    grid-row: 1;
+    grid-template-columns: 1fr;
+    justify-items: start;
     min-height: 0;
-    padding: 0.85rem 0.9rem;
+    padding: 1rem 1.05rem;
+    width: 100%;
   }
 
+  .ledger-marks--bills .ledger-mark-value .ledger-money-hero,
   .ledger-marks--spent .ledger-mark-spent-hero .ledger-money-hero {
     font-size: clamp(1.35rem, 6.2vw, 1.9rem);
+    justify-self: start;
+    text-align: left;
   }
 
   .ledger-marks--spent .ledger-mark-spent-hero.is-chips-only .ledger-money-chips-kicker {
     font-size: 0.72rem;
   }
 
-  .ledger-marks--spent .ledger-mark-budget {
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .ledger-marks--spent .ledger-mark-remaining {
-    grid-column: 2;
-    grid-row: 2;
-  }
-
-  .ledger-marks--spent .ledger-mark-over {
-    grid-column: 3;
-    grid-row: 2;
-  }
-
+  .ledger-marks--bills .ledger-mark-count,
+  .ledger-marks--bills .ledger-mark-due,
+  .ledger-marks--bills .ledger-mark-expired,
   .ledger-marks--spent .ledger-mark-budget,
   .ledger-marks--spent .ledger-mark-remaining,
   .ledger-marks--spent .ledger-mark-over {
-    align-content: center;
-    justify-items: center;
-    min-height: 4.35rem;
-    padding: 0.62rem 0.5rem;
-    text-align: center;
+    display: grid;
+    gap: 0.2rem;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    justify-items: start;
+    min-height: 0;
+    padding: 0.88rem 1rem;
+    text-align: left;
+    width: 100%;
   }
 
+  .ledger-marks--bills .ledger-mark-count dt,
+  .ledger-marks--bills .ledger-mark-due dt,
+  .ledger-marks--bills .ledger-mark-expired dt,
+  .ledger-marks--spent .ledger-mark-budget dt,
+  .ledger-marks--spent .ledger-mark-remaining dt,
+  .ledger-marks--spent .ledger-mark-over dt {
+    font-size: 0.74rem;
+    grid-row: 1;
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  .ledger-marks--bills .ledger-mark-count dd,
+  .ledger-marks--bills .ledger-mark-due dd,
+  .ledger-marks--bills .ledger-mark-expired dd,
+  .ledger-marks--spent .ledger-mark-budget dd,
+  .ledger-marks--spent .ledger-mark-remaining dd,
+  .ledger-marks--spent .ledger-mark-over dd {
+    grid-row: 2;
+    line-height: 1.1;
+    margin: 0;
+    max-width: 100%;
+    overflow: visible;
+    text-align: left;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  .ledger-marks--bills .ledger-mark-count dd {
+    font-size: clamp(1.2rem, 5.2vw, 1.55rem);
+  }
+
+  .ledger-marks--bills .ledger-mark-due dd.ledger-money,
+  .ledger-marks--bills .ledger-mark-expired dd.ledger-money,
   .ledger-marks--spent .ledger-mark-budget dd.ledger-money,
   .ledger-marks--spent .ledger-mark-remaining dd.ledger-money,
   .ledger-marks--spent .ledger-mark-over dd.ledger-money {
-    font-size: clamp(0.82rem, 3.6vw, 1rem);
+    font-size: clamp(1rem, 4.5vw, 1.2rem);
   }
 
-  .ledger-marks--spent .ledger-mark-meta,
-  .ledger-marks--spent .ledger-mark-hint {
-    font-size: 0.66rem;
+  .ledger-marks--bills .ledger-mark-meta,
+  .ledger-marks--spent .ledger-mark-meta {
+    font-size: 0.68rem;
+    grid-row: 3;
+    line-height: 1.3;
+    margin: 0;
+  }
+
+  .ledger-marks--spent .ledger-mark-spent-hero .ledger-mark-hint {
+    font-size: 0.68rem;
+    line-height: 1.3;
+    margin: 0;
+  }
+
+  .ledger-marks--bills .ledger-mark-due .ledger-money-chips,
+  .ledger-marks--bills .ledger-mark-expired .ledger-money-chips {
+    display: none;
   }
 
   .price-row,
@@ -3417,38 +3420,41 @@ button:focus-visible {
     width: 100%;
   }
 
+  .ledger-marks--bills,
+  .ledger-marks--spent {
+    gap: 0.48rem;
+  }
+
+  .ledger-marks--bills .ledger-mark-value,
+  .ledger-marks--spent .ledger-mark-spent-hero {
+    padding: 0.92rem 0.95rem;
+  }
+
   .ledger-marks--bills .ledger-mark-count,
   .ledger-marks--bills .ledger-mark-due,
-  .ledger-marks--bills .ledger-mark-expired {
-    min-height: 4rem;
-    padding: 0.55rem 0.42rem;
-  }
-
-  .ledger-marks--bills .ledger-mark-value .ledger-money-hero {
-    font-size: clamp(1.2rem, 5.8vw, 1.55rem);
-  }
-
-  .ledger-marks--bills .ledger-mark dt {
-    font-size: 0.68rem;
-  }
-
-  .ledger-marks--spent .ledger-mark-spent-hero {
-    padding: 0.78rem 0.82rem;
-  }
-
+  .ledger-marks--bills .ledger-mark-expired,
   .ledger-marks--spent .ledger-mark-budget,
   .ledger-marks--spent .ledger-mark-remaining,
   .ledger-marks--spent .ledger-mark-over {
-    min-height: 4rem;
-    padding: 0.55rem 0.42rem;
+    padding: 0.8rem 0.9rem;
   }
 
+  .ledger-marks--bills .ledger-mark-value .ledger-money-hero,
   .ledger-marks--spent .ledger-mark-spent-hero .ledger-money-hero {
     font-size: clamp(1.2rem, 5.8vw, 1.55rem);
   }
 
+  .ledger-marks--bills .ledger-mark-due dd.ledger-money,
+  .ledger-marks--bills .ledger-mark-expired dd.ledger-money,
+  .ledger-marks--spent .ledger-mark-budget dd.ledger-money,
+  .ledger-marks--spent .ledger-mark-remaining dd.ledger-money,
+  .ledger-marks--spent .ledger-mark-over dd.ledger-money {
+    font-size: clamp(0.95rem, 4.2vw, 1.1rem);
+  }
+
+  .ledger-marks--bills .ledger-mark dt,
   .ledger-marks--spent .ledger-mark dt {
-    font-size: 0.68rem;
+    font-size: 0.7rem;
   }
 
   .bill-calendar {
