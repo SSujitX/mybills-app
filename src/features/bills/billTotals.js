@@ -195,3 +195,28 @@ export const summarizeSpentMonth = (entries, monthKey, monthlyBudget) => {
     spentInBudgetCurrency,
   };
 };
+
+export const getSpentHeroDisplay = (summary) => {
+  const entries = Object.entries(summary.spentByCurrency || {})
+    .filter(([, amount]) => Number.isFinite(amount) && amount > 0)
+    .sort(([left], [right]) => left.localeCompare(right));
+
+  if (entries.length === 0) {
+    return { text: '—', chipsOnly: false };
+  }
+
+  if (entries.length === 1) {
+    const [currency, amount] = entries[0];
+    return { text: formatMoney(amount, currency), chipsOnly: false };
+  }
+
+  if (summary.budgetAmount !== null && summary.budgetCurrency) {
+    return {
+      hint: `Tracked in ${summary.budgetCurrency} budget`,
+      text: formatMoney(summary.spentInBudgetCurrency || 0, summary.budgetCurrency),
+      chipsOnly: false,
+    };
+  }
+
+  return { text: null, chipsOnly: true };
+};
