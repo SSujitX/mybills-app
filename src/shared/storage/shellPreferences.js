@@ -7,7 +7,9 @@ const DEFAULT_REMINDER_HOUR = 22;
 export const getDefaultShellPreferences = () => ({
   notificationsEnabled: false,
   reminderHour: DEFAULT_REMINDER_HOUR,
-  displayCurrency: getDefaultCurrency(),
+  lastBillCurrency: getDefaultCurrency(),
+  lastSpentCurrency: getDefaultCurrency(),
+  billTotalsCurrency: 'USD',
 });
 
 export const DEFAULT_SHELL_PREFERENCES = getDefaultShellPreferences();
@@ -23,14 +25,29 @@ const clampReminderHour = (value) => {
   return Math.min(22, Math.max(6, parsed));
 };
 
-const normalizePreferences = (preferences) => ({
-  notificationsEnabled: Boolean(preferences?.notificationsEnabled),
-  reminderHour: clampReminderHour(preferences?.reminderHour),
-  displayCurrency: normalizeSupportedCurrency(
-    preferences?.displayCurrency,
+const normalizePreferences = (preferences) => {
+  const fallbackCurrency = normalizeSupportedCurrency(
+    preferences?.lastBillCurrency || preferences?.displayCurrency,
     getDefaultCurrency(),
-  ),
-});
+  );
+
+  return {
+    notificationsEnabled: Boolean(preferences?.notificationsEnabled),
+    reminderHour: clampReminderHour(preferences?.reminderHour),
+    lastBillCurrency: normalizeSupportedCurrency(
+      preferences?.lastBillCurrency || preferences?.displayCurrency,
+      fallbackCurrency,
+    ),
+    lastSpentCurrency: normalizeSupportedCurrency(
+      preferences?.lastSpentCurrency || preferences?.displayCurrency,
+      fallbackCurrency,
+    ),
+    billTotalsCurrency: normalizeSupportedCurrency(
+      preferences?.billTotalsCurrency || preferences?.displayCurrency,
+      'USD',
+    ),
+  };
+};
 
 export const loadShellPreferences = () => {
   const raw = getStore()?.getItem(SHELL_PREFERENCES_KEY);
