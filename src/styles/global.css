@@ -944,6 +944,47 @@ svg {
   border-top-color: var(--green);
 }
 
+.ledger-mark-spent-hero {
+  border-top-color: var(--green);
+  gap: 0.45rem;
+}
+
+.ledger-mark-budget {
+  border-top-color: var(--amber);
+}
+
+.ledger-mark-remaining {
+  border-top-color: var(--teal);
+}
+
+.ledger-mark-over {
+  border-top-color: var(--coral);
+}
+
+.ledger-mark-spent-hero.is-chips-only .ledger-money-chips {
+  margin-top: 0.1rem;
+}
+
+.ledger-mark-spent-hero.is-chips-only .ledger-money-chips-kicker {
+  font-size: 0.68rem;
+}
+
+.ledger-mark-hint {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.ledger-money-chips--spent .ledger-money-chip {
+  background: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.24);
+  color: #86efac;
+}
+
+.ledger-money-positive {
+  color: #86efac;
+}
+
 .ledger-marks dt {
   color: var(--text-muted);
   font-size: 0.78rem;
@@ -2906,9 +2947,62 @@ button:focus-visible {
     display: none;
   }
 
-  .ledger-marks:not(.ledger-marks--bills) {
-    gap: 2px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .ledger-marks--spent {
+    gap: 3px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: auto auto;
+  }
+
+  .ledger-marks--spent .ledger-mark-spent-hero {
+    gap: 0.5rem;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-height: 0;
+    padding: 0.85rem 0.9rem;
+  }
+
+  .ledger-marks--spent .ledger-mark-spent-hero .ledger-money-hero {
+    font-size: clamp(1.35rem, 6.2vw, 1.9rem);
+  }
+
+  .ledger-marks--spent .ledger-mark-spent-hero.is-chips-only .ledger-money-chips-kicker {
+    font-size: 0.72rem;
+  }
+
+  .ledger-marks--spent .ledger-mark-budget {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .ledger-marks--spent .ledger-mark-remaining {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .ledger-marks--spent .ledger-mark-over {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .ledger-marks--spent .ledger-mark-budget,
+  .ledger-marks--spent .ledger-mark-remaining,
+  .ledger-marks--spent .ledger-mark-over {
+    align-content: center;
+    justify-items: center;
+    min-height: 4.35rem;
+    padding: 0.62rem 0.5rem;
+    text-align: center;
+  }
+
+  .ledger-marks--spent .ledger-mark-budget dd.ledger-money,
+  .ledger-marks--spent .ledger-mark-remaining dd.ledger-money,
+  .ledger-marks--spent .ledger-mark-over dd.ledger-money {
+    font-size: clamp(0.82rem, 3.6vw, 1rem);
+  }
+
+  .ledger-marks--spent .ledger-mark-meta,
+  .ledger-marks--spent .ledger-mark-hint {
+    font-size: 0.66rem;
   }
 
   .price-row,
@@ -3335,6 +3429,25 @@ button:focus-visible {
   }
 
   .ledger-marks--bills .ledger-mark dt {
+    font-size: 0.68rem;
+  }
+
+  .ledger-marks--spent .ledger-mark-spent-hero {
+    padding: 0.78rem 0.82rem;
+  }
+
+  .ledger-marks--spent .ledger-mark-budget,
+  .ledger-marks--spent .ledger-mark-remaining,
+  .ledger-marks--spent .ledger-mark-over {
+    min-height: 4rem;
+    padding: 0.55rem 0.42rem;
+  }
+
+  .ledger-marks--spent .ledger-mark-spent-hero .ledger-money-hero {
+    font-size: clamp(1.2rem, 5.8vw, 1.55rem);
+  }
+
+  .ledger-marks--spent .ledger-mark dt {
     font-size: 0.68rem;
   }
 
