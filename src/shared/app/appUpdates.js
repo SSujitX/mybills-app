@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
+import { FileTransfer } from '@capacitor/file-transfer';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import {
@@ -87,16 +88,10 @@ export const getCurrentAppVersion = async (fallbackVersion = APP_VERSION) => {
   }
 };
 
-const blobToBase64 = (blob) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onloadend = () => {
-    const result = String(reader.result || '');
-    const base64Data = result.includes(',') ? result.split(',')[1] : result;
-    resolve(base64Data);
-  };
-  reader.onerror = () => reject(new Error('blob-read-failed'));
-  reader.readAsDataURL(blob);
-});
+const GITHUB_DOWNLOAD_HEADERS = {
+  Accept: 'application/octet-stream',
+  'User-Agent': 'MyBills-App',
+};
 
 export const useAppUpdates = () => {
   const [currentAppVersion, setCurrentAppVersion] = useState(
@@ -114,14 +109,6 @@ export const useAppUpdates = () => {
   const [updateDownloadErrorText, setUpdateDownloadErrorText] = useState('');
 
   const isCheckingUpdateRef = useRef(false);
-  const updateDownloadRequestRef = useRef(null);
-
-  useEffect(() => () => {
-    if (updateDownloadRequestRef.current) {
-      updateDownloadRequestRef.current.abort();
-      updateDownloadRequestRef.current = null;
-    }
-  }, []);
 
   const checkForAppUpdate = useCallback(async ({ manual = false } = {}) => {
     if (isCheckingUpdateRef.current) return;
@@ -190,27 +177,49 @@ export const useAppUpdates = () => {
     checkForAppUpdate({ manual: false });
   }, [checkForAppUpdate]);
 
-  const downloadApkBlob = useCallback((url) => new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    updateDownloadRequestRef.current = xhr;
-    xhr.open('GET', url, true);
-    xhr.responseType = 'blob';
-    xhr.onprogress = (event) => {
-      if (!event.lengthComputable) return;
-      setUpdateDownloadProgress(Math.round((event.loaded / event.total) * 100));
-      setUpdateDownloadBytesText(`${formatBytes(event.loaded)} / ${formatBytes(event.total)}`);
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(xhr.response);
-        return;
-      }
-      reject(new Error(`download-failed-${xhr.status}`));
-    };
-    xhr.onerror = () => reject(new Error('download-network-error'));
-    xhr.onabort = () => reject(new Error('download-aborted'));
-    xhr.send();
-  }), []);
+  const downloadUpdateWithFileTransfer = useCallback(async (url, targetPath) => {
+    try {
+      await Filesystem.mkdir({
+        path: UPDATE_DOWNLOAD_FOLDER,
+        directory: Directory.Documents,
+        recursive: true,
+      });
+    } catch {
+      // Parent folder may already exist.
+    }
+
+    const destination = await Filesystem.getUri({
+      path: targetPath,
+      directory: Directory.Documents,
+    });
+
+    let progressListener = null;
+    try {
+      progressListener = await FileTransfer.addListener('progress', (progress) => {
+        if (progress.type !== 'download') return;
+
+        const loaded = Number(progress.bytes || 0);
+        const total = Number(progress.contentLength || 0);
+        if (progress.lengthComputable && total > 0) {
+          setUpdateDownloadProgress(Math.round((loaded / total) * 100));
+          setUpdateDownloadBytesText(`${formatBytes(loaded)} / ${formatBytes(total)}`);
+        } else if (loaded > 0) {
+          setUpdateDownloadBytesText(`${formatBytes(loaded)} downloaded`);
+        }
+      });
+
+      await FileTransfer.downloadFile({
+        url,
+        path: destination.uri,
+        progress: true,
+        headers: GITHUB_DOWNLOAD_HEADERS,
+      });
+    } finally {
+      await progressListener?.remove();
+    }
+
+    return destination.uri;
+  }, []);
 
   const handleDownloadUpdate = async () => {
     if (!updateInfo?.apkUrl || isUpdateDownloading) return;
@@ -226,97 +235,45 @@ export const useAppUpdates = () => {
     const targetPath = `${UPDATE_DOWNLOAD_FOLDER}/${fileName}`;
 
     try {
-      if (Capacitor.isNativePlatform() && typeof Filesystem.downloadFile === 'function') {
-        let progressListener = null;
-
-        try {
-          progressListener = await Filesystem.addListener('progress', (event) => {
-            const total = Number(event?.contentLength || 0);
-            const loaded = Number(event?.bytes || 0);
-            if (total > 0) {
-              setUpdateDownloadProgress(Math.round((loaded / total) * 100));
-              setUpdateDownloadBytesText(`${formatBytes(loaded)} / ${formatBytes(total)}`);
-            } else if (loaded > 0) {
-              setUpdateDownloadBytesText(`${formatBytes(loaded)} downloaded`);
-            }
-          });
-        } catch {
-          progressListener = null;
-        }
-
-        await Filesystem.downloadFile({
-          url: updateInfo.apkUrl,
-          path: targetPath,
-          directory: Directory.Documents,
-          recursive: true,
-          progress: true,
-        });
-
-        if (progressListener) {
-          await progressListener.remove();
-        }
-
-        const fileUri = await Filesystem.getUri({
-          path: targetPath,
-          directory: Directory.Documents,
-        });
-
+      if (Capacitor.isNativePlatform()) {
+        const downloadedUri = await downloadUpdateWithFileTransfer(updateInfo.apkUrl, targetPath);
         setUpdateDownloadProgress(100);
         setUpdateDownloadBytesText('Download complete');
-        setUpdateDownloadedApkUri(fileUri.uri);
+        setUpdateDownloadedApkUri(downloadedUri);
         setUpdateDownloadedFileName(fileName);
         return;
       }
 
-      const apkBlob = await downloadApkBlob(updateInfo.apkUrl);
-
-      if (Capacitor.isNativePlatform()) {
-        const base64Data = await blobToBase64(apkBlob);
-        await Filesystem.writeFile({
-          path: targetPath,
-          data: base64Data,
-          directory: Directory.Documents,
-          recursive: true,
-        });
-        const fileUri = await Filesystem.getUri({
-          path: targetPath,
-          directory: Directory.Documents,
-        });
-        setUpdateDownloadedApkUri(fileUri.uri);
-      } else {
-        const objectUrl = URL.createObjectURL(apkBlob);
-        const anchor = document.createElement('a');
-        anchor.href = objectUrl;
-        anchor.download = fileName;
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
-        URL.revokeObjectURL(objectUrl);
-        setUpdateDownloadedApkUri('browser-download');
-      }
+      // Browser XHR cannot follow GitHub release redirects (CORS). Open the asset URL directly.
+      const anchor = document.createElement('a');
+      anchor.href = updateInfo.apkUrl;
+      anchor.download = fileName;
+      anchor.rel = 'noopener noreferrer';
+      anchor.target = '_blank';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
 
       setUpdateDownloadProgress(100);
-      setUpdateDownloadBytesText('Download complete');
+      setUpdateDownloadBytesText('Download started in your browser');
+      setUpdateDownloadedApkUri('browser-download');
       setUpdateDownloadedFileName(fileName);
     } catch (error) {
       console.error('Update download failed:', error);
-      const isAborted = String(error?.message || '').includes('aborted');
-      setUpdateDownloadErrorText(
-        isAborted ? 'Download cancelled.' : 'Update download failed. Try again.',
-      );
+      setUpdateDownloadErrorText('Update download failed. Try again on the Android app build.');
     } finally {
-      updateDownloadRequestRef.current = null;
       setIsUpdateDownloading(false);
     }
   };
 
   const handleCancelUpdateDownload = () => {
-    const request = updateDownloadRequestRef.current;
-    if (!request) return;
-    request.abort();
-    updateDownloadRequestRef.current = null;
-    setIsUpdateDownloading(false);
-    setUpdateDownloadErrorText('Download cancelled.');
+    if (!Capacitor.isNativePlatform()) {
+      setIsUpdateDownloading(false);
+      setUpdateDownloadErrorText('Download cancelled.');
+      return;
+    }
+
+    setUpdateDownloadErrorText('Cancel is not available during a native download.');
   };
 
   const handleInstallUpdate = async () => {
