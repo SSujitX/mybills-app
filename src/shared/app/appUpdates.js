@@ -110,6 +110,33 @@ export const useAppUpdates = () => {
 
   const isCheckingUpdateRef = useRef(false);
 
+  const refreshCurrentAppVersion = useCallback(async () => {
+    const version = await getCurrentAppVersion(currentAppVersion);
+    setCurrentAppVersion(version);
+    localStorage.setItem(CURRENT_APP_VERSION_KEY, version);
+    return version;
+  }, [currentAppVersion]);
+
+  useEffect(() => {
+    refreshCurrentAppVersion();
+  }, [refreshCurrentAppVersion]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+
+    let listenerHandle = null;
+    const registerResumeHandler = async () => {
+      listenerHandle = await CapacitorApp.addListener('resume', () => {
+        refreshCurrentAppVersion();
+      });
+    };
+
+    registerResumeHandler();
+    return () => {
+      listenerHandle?.remove();
+    };
+  }, [refreshCurrentAppVersion]);
+
   const checkForAppUpdate = useCallback(async ({ manual = false } = {}) => {
     if (isCheckingUpdateRef.current) return;
     isCheckingUpdateRef.current = true;
@@ -118,12 +145,10 @@ export const useAppUpdates = () => {
 
     try {
       const [version, latestRelease] = await Promise.all([
-        getCurrentAppVersion(currentAppVersion),
+        refreshCurrentAppVersion(),
         fetchLatestRelease(),
       ]);
 
-      setCurrentAppVersion(version);
-      localStorage.setItem(CURRENT_APP_VERSION_KEY, version);
       localStorage.setItem(UPDATE_LAST_CHECK_KEY, String(Date.now()));
 
       if (!latestRelease.latestVersion) {
@@ -165,7 +190,7 @@ export const useAppUpdates = () => {
       isCheckingUpdateRef.current = false;
       setIsCheckingUpdate(false);
     }
-  }, [currentAppVersion]);
+  }, [refreshCurrentAppVersion]);
 
   const checkOnLaunch = useCallback(() => {
     if (!Capacitor.isNativePlatform()) return;
