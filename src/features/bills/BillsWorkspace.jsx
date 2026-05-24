@@ -55,9 +55,11 @@ import {
   createEmptySpentDraft,
   createSpentFromDraft,
   loadCustomSpendCategories,
+  loadHiddenSpendCategories,
   loadMonthlyBudget,
   loadSpentEntries,
   saveCustomSpendCategories,
+  saveHiddenSpendCategories,
   saveMonthlyBudget,
   saveSpentEntries,
   SPEND_CATEGORIES,
@@ -369,23 +371,48 @@ function CategoryField({
   customValue,
   onCustomValueChange,
   onAddCustomCategory,
+  onDeleteCustomCategory,
   onToggle,
 }) {
   return (
     <div className="category-field">
       <span className="field-label">Where spent</span>
       <div className="category-options" role="group" aria-label="Spending categories">
-        {categories.map((category) => (
-          <button
-            className={values.includes(category) ? 'is-selected' : ''}
-            type="button"
-            aria-pressed={values.includes(category)}
-            key={category}
-            onClick={() => onToggle(category)}
-          >
-            {category}
-          </button>
-        ))}
+        {categories.map((category) => {
+          const isSelected = values.includes(category);
+
+          return (
+            <span
+              className={[
+                'category-chip',
+                isSelected ? 'is-selected' : '',
+                'has-delete',
+              ].filter(Boolean).join(' ')}
+              key={category}
+            >
+              <button
+                className="category-chip-main"
+                type="button"
+                aria-label={isSelected ? `Remove ${category}` : `Add ${category}`}
+                aria-pressed={isSelected}
+                onClick={() => onToggle(category)}
+              >
+                <span>{category}</span>
+              </button>
+              <button
+                className="category-delete-mark"
+                aria-label={`Delete ${category}`}
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDeleteCustomCategory(category);
+                }}
+              >
+                <X aria-hidden="true" />
+              </button>
+            </span>
+          );
+        })}
       </div>
       <div className="custom-category-row">
         <input
@@ -416,6 +443,7 @@ export default function BillsWorkspace() {
     currency: shellPreferences.lastSpentCurrency,
   }));
   const [customSpendCategories, setCustomSpendCategories] = useState(() => loadCustomSpendCategories());
+  const [hiddenSpendCategories, setHiddenSpendCategories] = useState(() => loadHiddenSpendCategories());
   const [customCategoryDraft, setCustomCategoryDraft] = useState('');
   const [monthlyBudget, setMonthlyBudget] = useState(() => loadMonthlyBudget());
   const [budgetDraft, setBudgetDraft] = useState(() => {
@@ -433,6 +461,7 @@ export default function BillsWorkspace() {
   const [deleteSpentId, setDeleteSpentId] = useState('');
   const [formError, setFormError] = useState('');
   const [spentFormError, setSpentFormError] = useState('');
+  const overlayStateRef = useRef({});
   const ratesState = useExchangeRates();
 
   useEffect(() => {
@@ -447,6 +476,10 @@ export default function BillsWorkspace() {
   useEffect(() => {
     saveCustomSpendCategories(customSpendCategories);
   }, [customSpendCategories]);
+
+  useEffect(() => {
+    saveHiddenSpendCategories(hiddenSpendCategories);
+  }, [hiddenSpendCategories]);
 
   useEffect(() => {
     saveMonthlyBudget(monthlyBudget);
@@ -491,20 +524,21 @@ export default function BillsWorkspace() {
 
   const spendCategories = useMemo(() => {
     const seen = new Set();
+    const hiddenKeys = new Set(hiddenSpendCategories.map((category) => category.toLocaleLowerCase()));
     return [
       ...SPEND_CATEGORIES,
       ...customSpendCategories,
-      ...spentEntries.flatMap((entry) => getSpentCategories(entry)),
     ]
       .filter((category) => {
         const normalized = String(category || '').trim();
         if (!normalized) return false;
         const key = normalized.toLocaleLowerCase();
+        if (hiddenKeys.has(key)) return false;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       });
-  }, [customSpendCategories, spentEntries]);
+  }, [customSpendCategories, hiddenSpendCategories]);
 
   const rememberBillCurrency = (currency) => {
     setShellPreferences((current) => saveShellPreferences({
@@ -633,10 +667,37 @@ export default function BillsWorkspace() {
       }
       return [...current, nextCategory];
     });
+    setHiddenSpendCategories((current) => current.filter(
+      (category) => category.toLocaleLowerCase() !== nextCategory.toLocaleLowerCase(),
+    ));
     updateSpentDraft('categories', spentDraft.categories.includes(nextCategory)
       ? spentDraft.categories
       : [...spentDraft.categories, nextCategory]);
     setCustomCategoryDraft('');
+  };
+
+  const deleteCustomSpendCategory = (category) => {
+    const normalized = normalizeSpendCategory(category);
+    if (!normalized) return;
+    const normalizedKey = normalized.toLocaleLowerCase();
+
+    setCustomSpendCategories((current) => current.filter(
+      (item) => item.toLocaleLowerCase() !== normalizedKey,
+    ));
+    setHiddenSpendCategories((current) => (
+      current.some((item) => item.toLocaleLowerCase() === normalizedKey)
+        ? current
+        : [...current, normalized]
+    ));
+    setSpentDraft((current) => ({
+      ...current,
+      categories: current.categories.filter(
+        (item) => item.toLocaleLowerCase() !== normalizedKey,
+      ),
+    }));
+    if (customCategoryDraft.toLocaleLowerCase() === normalizedKey) {
+      setCustomCategoryDraft('');
+    }
   };
 
   const resetSpentComposer = () => {
@@ -700,6 +761,49 @@ export default function BillsWorkspace() {
     if (editingSpentId === deleteSpentCandidate.id) closeSpentComposer();
     setDeleteSpentId('');
   };
+
+  useEffect(() => {
+    overlayStateRef.current = {
+      deleteBillId,
+      deleteSpentId,
+      isComposerOpen,
+      isSpentComposerOpen,
+    };
+  }, [deleteBillId, deleteSpentId, isComposerOpen, isSpentComposerOpen]);
+
+  useEffect(() => {
+    globalThis.__myBillsCloseWorkspaceOverlay = () => {
+      const state = overlayStateRef.current;
+
+      if (state.deleteSpentId) {
+        setDeleteSpentId('');
+        return true;
+      }
+
+      if (state.deleteBillId) {
+        setDeleteBillId('');
+        return true;
+      }
+
+      if (state.isSpentComposerOpen) {
+        closeSpentComposer();
+        return true;
+      }
+
+      if (state.isComposerOpen) {
+        closeComposer();
+        return true;
+      }
+
+      return false;
+    };
+
+    return () => {
+      if (globalThis.__myBillsCloseWorkspaceOverlay) {
+        delete globalThis.__myBillsCloseWorkspaceOverlay;
+      }
+    };
+  }, [closeComposer, closeSpentComposer]);
 
   const updateBudgetDraft = (field, value) => {
     setBudgetDraft((current) => ({ ...current, [field]: value }));
@@ -1165,6 +1269,7 @@ export default function BillsWorkspace() {
                 customValue={customCategoryDraft}
                 onCustomValueChange={setCustomCategoryDraft}
                 onAddCustomCategory={addCustomSpendCategory}
+                onDeleteCustomCategory={deleteCustomSpendCategory}
                 onToggle={toggleSpentCategory}
               />
 
