@@ -66,17 +66,15 @@ svg {
 }
 
 .app-container {
+  --app-pad-bottom: max(1.35rem, env(safe-area-inset-bottom, 0px));
+  --app-pad-x: max(1rem, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   margin: 0 auto;
   max-width: 1024px;
   min-height: 100dvh;
-  padding:
-    max(0.75rem, env(safe-area-inset-top, 0px))
-    max(1rem, env(safe-area-inset-right, 0px))
-    max(1.35rem, env(safe-area-inset-bottom, 0px))
-    max(1rem, env(safe-area-inset-left, 0px));
+  padding: 0 var(--app-pad-x) var(--app-pad-bottom);
   width: 100%;
 }
 
@@ -476,13 +474,19 @@ svg {
 }
 
 .app-header {
-  background: var(--bg-deep);
+  background:
+    linear-gradient(180deg, rgba(7, 7, 10, 0.98), rgba(7, 7, 10, 0.92));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   flex-shrink: 0;
   justify-content: center;
-  margin-bottom: 0.85rem;
-  padding: calc(0.42rem + env(safe-area-inset-top, 0px)) 0 0.55rem;
+  margin: 0 calc(var(--app-pad-x) * -1) 0.85rem;
+  padding:
+    calc(0.5rem + env(safe-area-inset-top, 0px))
+    var(--app-pad-x)
+    0.58rem;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -565,6 +569,7 @@ svg {
   min-width: 0;
   overflow: visible;
   overscroll-behavior: auto;
+  position: relative;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -1318,7 +1323,7 @@ svg {
   overflow-x: clip;
   padding: 1rem;
   position: fixed;
-  z-index: 30;
+  z-index: 300;
 }
 
 .composer-dialog {
@@ -3116,7 +3121,7 @@ button:focus-visible {
 
   .settings-dialog {
     border-radius: 12px 12px 0 0;
-    max-height: min(90dvh, none);
+    max-height: calc(100dvh - max(1.3rem, env(safe-area-inset-top, 0px)) - max(0.65rem, env(safe-area-inset-bottom, 0px)));
     max-width: 100%;
   }
 
@@ -3147,8 +3152,7 @@ button:focus-visible {
   }
 
   .app-container {
-    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+    --app-pad-x: max(0.85rem, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
   }
 
   .bill-workspace {
@@ -3319,7 +3323,7 @@ button:focus-visible {
 
   .composer-dialog {
     border-radius: 12px 12px 0 0;
-    max-height: min(94dvh, none);
+    max-height: calc(100dvh - max(1.3rem, env(safe-area-inset-top, 0px)) - max(0.65rem, env(safe-area-inset-bottom, 0px)));
     max-width: 100%;
   }
 
@@ -3330,7 +3334,7 @@ button:focus-visible {
   }
 
   .composer-dialog {
-    max-height: min(92dvh, none);
+    max-height: calc(100dvh - max(1.3rem, env(safe-area-inset-top, 0px)) - max(0.65rem, env(safe-area-inset-bottom, 0px)));
   }
 
   .composer-head {
