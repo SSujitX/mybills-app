@@ -93,6 +93,10 @@ export default function AppSettings() {
           return;
         }
 
+        if (globalThis.__myBillsCloseWorkspaceOverlay?.()) {
+          return;
+        }
+
         if (isOpenRef.current) {
           setIsOpen(false);
           return;
