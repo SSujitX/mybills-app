@@ -1,6 +1,6 @@
 export default function AppHeader() {
   const scrollHome = () => {
-    document.querySelector('.app-main')?.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
