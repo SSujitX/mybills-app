@@ -85,7 +85,7 @@ export default function AppSettings() {
 
     let listenerHandle = null;
     const registerBackHandler = async () => {
-      listenerHandle = await CapacitorApp.addListener('backButton', () => {
+      listenerHandle = await CapacitorApp.addListener('backButton', ({ canGoBack }) => {
         if (isUpdateModalOpenRef.current) {
           if (!isUpdateDownloadingRef.current) {
             handleCloseUpdateModal();
@@ -95,7 +95,15 @@ export default function AppSettings() {
 
         if (isOpenRef.current) {
           setIsOpen(false);
+          return;
         }
+
+        if (canGoBack) {
+          window.history.back();
+          return;
+        }
+
+        CapacitorApp.exitApp();
       });
     };
 
