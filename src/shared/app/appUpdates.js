@@ -3,7 +3,6 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { FileTransfer } from '@capacitor/file-transfer';
 import { Directory, Filesystem } from '@capacitor/filesystem';
-import { Share } from '@capacitor/share';
 import {
   CURRENT_APP_VERSION_KEY,
   RELEASE_LATEST_API_URL,
@@ -11,6 +10,7 @@ import {
   UPDATE_DOWNLOAD_FOLDER,
   UPDATE_LAST_CHECK_KEY,
 } from './appUpdateConfig.js';
+import { installApk } from './apkInstaller.js';
 import { APP_VERSION } from './appInfo.js';
 
 export const normalizeVersion = (value) => String(value || '').trim().replace(/^v/i, '');
@@ -312,17 +312,10 @@ export const useAppUpdates = () => {
     }
 
     try {
-      await Share.share({
-        title: 'MyBills update',
-        text: 'Choose Open or Package Installer to install the update APK.',
-        url: updateDownloadedApkUri,
-        dialogTitle: 'Install MyBills update',
-      });
+      await installApk(updateDownloadedApkUri);
     } catch (error) {
       console.error('Update install handoff failed:', error);
-      if (updateInfo?.releaseUrl) {
-        window.open(updateInfo.releaseUrl, '_blank', 'noopener,noreferrer');
-      }
+      setUpdateDownloadErrorText('Could not open Android installer. Download the APK from GitHub releases.');
     }
   };
 
