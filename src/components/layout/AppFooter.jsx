@@ -6,7 +6,14 @@ export default function AppFooter() {
 
   return (
     <footer className="app-footer">
-      <p>Copyright {yearText} MyBills. Built by Sujit Biswas.</p>
+      <p>Copyright {yearText} MyBills.</p>
+      <p>
+        Built by{' '}
+        <a href="https://github.com/SSujitX" target="_blank" rel="noreferrer">
+          Sujit Biswas
+        </a>
+        .
+      </p>
     </footer>
   );
 }
