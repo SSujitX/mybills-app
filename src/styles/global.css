@@ -66,7 +66,7 @@ svg {
 }
 
 .app-container {
-  --app-header-space: calc(6.85rem + env(safe-area-inset-top, 0px));
+  --app-header-space: calc(8.1rem + env(safe-area-inset-top, 0px));
   --app-pad-bottom: max(1.35rem, env(safe-area-inset-bottom, 0px));
   --app-pad-x: max(1rem, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
   box-sizing: border-box;
@@ -1118,7 +1118,9 @@ svg {
   grid-column: 1 / -1;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+  z-index: 8;
 }
 
 .bill-totals-estimate-cell {
@@ -1230,28 +1232,33 @@ svg {
 
 .bill-totals-currency-trigger {
   align-items: center;
-  background: rgba(7, 7, 10, 0.35);
-  border: 1px solid rgba(45, 212, 191, 0.3);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025)),
+    #151820;
+  border: 1px solid rgba(45, 212, 191, 0.28);
   border-radius: 8px;
   color: var(--text-primary);
   display: inline-flex;
-  font-size: 0.86rem;
-  font-weight: 750;
-  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 680;
+  gap: 0.55rem;
   justify-content: space-between;
   line-height: 1;
-  min-height: 2.15rem;
+  min-height: 2.6rem;
   min-width: 0;
-  padding: 0.42rem 0.58rem;
+  padding: 0.58rem 0.74rem;
   width: 100%;
   transition:
     background var(--transition-fast),
-    border-color var(--transition-fast);
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .bill-totals-currency-trigger:hover {
-  background: rgba(45, 212, 191, 0.1);
-  border-color: rgba(45, 212, 191, 0.38);
+  background:
+    linear-gradient(180deg, rgba(45, 212, 191, 0.1), rgba(255, 255, 255, 0.03)),
+    #171b22;
+  border-color: rgba(45, 212, 191, 0.46);
 }
 
 .bill-totals-currency-trigger:focus-visible {
@@ -1272,32 +1279,35 @@ svg {
 
 .bill-totals-currency-menu {
   background:
-    linear-gradient(145deg, rgba(45, 212, 191, 0.12), transparent 46%),
-    #171920;
-  border: 1px solid rgba(45, 212, 191, 0.24);
+    linear-gradient(145deg, rgba(45, 212, 191, 0.14), transparent 48%),
+    #171a22;
+  border: 1px solid rgba(45, 212, 191, 0.3);
   border-radius: 8px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.035);
   display: grid;
-  gap: 0.22rem;
-  max-height: 12rem;
-  min-width: 5.5rem;
+  gap: 0.32rem;
+  left: 0;
+  max-height: min(13.5rem, 38dvh);
+  min-width: min(13rem, 72vw);
   overflow-y: auto;
-  padding: 0.32rem;
+  padding: 0.42rem;
   position: absolute;
   right: 0;
-  top: calc(100% + 0.3rem);
-  z-index: 14;
+  top: calc(100% + 0.44rem);
+  z-index: 80;
 }
 
 .bill-totals-currency-menu button {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  min-height: 1.9rem;
-  padding: 0.3rem 0.45rem;
+  min-height: 2.3rem;
+  padding: 0.46rem 0.62rem;
   text-align: left;
   transition:
     background var(--transition-fast),
@@ -1307,8 +1317,9 @@ svg {
 
 .bill-totals-currency-menu button:hover,
 .bill-totals-currency-menu button.is-selected {
-  background: rgba(45, 212, 191, 0.12);
-  border-color: rgba(45, 212, 191, 0.22);
+  background: rgba(45, 212, 191, 0.14);
+  border-color: rgba(45, 212, 191, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.08);
   color: #99f6e4;
 }
 
@@ -1807,36 +1818,81 @@ select option {
   gap: 0.42rem;
 }
 
-.category-options button {
+.category-chip {
+  display: inline-flex;
+  position: relative;
+}
+
+.category-chip-main {
+  align-items: center;
   background: rgba(255, 255, 255, 0.045);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
   color: var(--text-secondary);
+  display: inline-flex;
   font-size: 0.78rem;
   font-weight: 600;
+  gap: 0.42rem;
+  justify-content: center;
   min-height: 2.05rem;
   padding: 0.38rem 0.68rem;
+  position: relative;
   transition:
     background var(--transition-fast),
     border-color var(--transition-fast),
     color var(--transition-fast),
-    transform var(--transition-fast);
+  transform var(--transition-fast);
 }
 
-.category-options button:hover,
-.category-options button.is-selected {
+.category-chip-main:hover,
+.category-chip.is-selected .category-chip-main {
   background: rgba(45, 212, 191, 0.12);
   border-color: rgba(45, 212, 191, 0.28);
   color: #d9fffa;
 }
 
-.category-options button.is-selected {
+.category-chip.is-selected .category-chip-main {
   background: linear-gradient(135deg, rgba(16, 139, 104, 0.72), rgba(15, 118, 110, 0.82));
   border-color: rgba(110, 231, 183, 0.52);
   box-shadow:
     inset 0 0 0 1px rgba(187, 247, 208, 0.12),
     0 8px 20px rgba(16, 139, 104, 0.16);
   color: #ecfdf5;
+}
+
+.category-chip.has-delete .category-chip-main {
+  padding-right: 1.28rem;
+}
+
+.category-delete-mark {
+  align-items: center;
+  background: rgba(7, 7, 10, 0.36);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: #d9fffa;
+  display: inline-flex;
+  font-weight: 700;
+  height: 1rem;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  position: absolute;
+  right: -0.24rem;
+  top: -0.22rem;
+  width: 1rem;
+}
+
+.category-delete-mark svg {
+  height: 0.66rem;
+  width: 0.66rem;
+}
+
+.category-delete-mark:hover,
+.category-delete-mark:focus-visible {
+  background: rgba(251, 113, 133, 0.16);
+  border-color: rgba(251, 113, 133, 0.35);
+  color: #fecdd3;
+  outline: none;
 }
 
 .custom-category-row {
@@ -2934,7 +2990,23 @@ button:focus-visible {
 
 .app-footer p {
   font-size: 0.78rem;
-  margin: 0;
+  margin: 0.18rem 0 0;
+}
+
+.app-footer p:first-child {
+  margin-top: 0;
+}
+
+.app-footer a {
+  color: #99f6e4;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  color: #ccfbf1;
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
 }
 
 @media (max-width: 860px) {
@@ -3180,7 +3252,7 @@ button:focus-visible {
   }
 
   .app-container {
-    --app-header-space: calc(7.15rem + env(safe-area-inset-top, 0px));
+    --app-header-space: calc(8.45rem + env(safe-area-inset-top, 0px));
     --app-pad-x: max(0.85rem, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
   }
 
@@ -3542,6 +3614,7 @@ button:focus-visible {
 }
 
 .settings-about-updates {
+  justify-items: center;
   display: grid;
   gap: 0.5rem;
   min-width: 0;
@@ -3549,7 +3622,10 @@ button:focus-visible {
 
 .settings-repo-link {
   color: #5eead4;
+  display: inline-flex;
   font-weight: 600;
+  justify-self: center;
+  text-align: center;
   text-decoration: underline;
   text-underline-offset: 0.14em;
 }
