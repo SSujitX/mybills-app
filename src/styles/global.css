@@ -66,6 +66,7 @@ svg {
 }
 
 .app-container {
+  --app-header-space: calc(6.85rem + env(safe-area-inset-top, 0px));
   --app-pad-bottom: max(1.35rem, env(safe-area-inset-bottom, 0px));
   --app-pad-x: max(1rem, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
   box-sizing: border-box;
@@ -74,7 +75,7 @@ svg {
   margin: 0 auto;
   max-width: 1024px;
   min-height: 100dvh;
-  padding: 0 var(--app-pad-x) var(--app-pad-bottom);
+  padding: var(--app-header-space) var(--app-pad-x) var(--app-pad-bottom);
   width: 100%;
 }
 
@@ -113,7 +114,7 @@ svg {
 }
 
 .settings-backdrop {
-  z-index: 35;
+  z-index: 320;
 }
 
 .settings-dialog {
@@ -479,18 +480,21 @@ svg {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-  margin: 0 calc(var(--app-pad-x) * -1) 0.85rem;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+  left: 0;
+  margin: 0;
   padding:
     calc(0.5rem + env(safe-area-inset-top, 0px))
     var(--app-pad-x)
     0.62rem;
-  position: sticky;
+  position: fixed;
+  right: 0;
   top: 0;
   transition:
     background var(--transition-fast),
     border-color var(--transition-fast),
     box-shadow var(--transition-fast);
+  width: 100%;
   z-index: 100;
 }
 
@@ -3176,6 +3180,7 @@ button:focus-visible {
   }
 
   .app-container {
+    --app-header-space: calc(7.15rem + env(safe-area-inset-top, 0px));
     --app-pad-x: max(0.85rem, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
   }
 
@@ -3581,7 +3586,7 @@ button:focus-visible {
 }
 
 .update-backdrop {
-  z-index: 45;
+  z-index: 340;
 }
 
 .update-modal-content {
