@@ -4,6 +4,7 @@ import { normalizeSupportedCurrency } from '../../shared/currency/supportedCurre
 const SPENT_KEY = 'mybills:spent-entries';
 const BUDGET_KEY = 'mybills:monthly-budget';
 const CUSTOM_CATEGORIES_KEY = 'mybills:spent-custom-categories';
+const HIDDEN_CATEGORIES_KEY = 'mybills:spent-hidden-categories';
 
 export const SPEND_CATEGORIES = [
   'Food',
@@ -77,7 +78,7 @@ export const createEmptySpentDraft = () => ({
   details: '',
   amount: '',
   currency: getDefaultCurrency(),
-  categories: [SPEND_CATEGORIES[0]],
+  categories: [],
   spentDate: todayKey(),
 });
 
@@ -167,6 +168,25 @@ export const loadCustomSpendCategories = () => {
 export const saveCustomSpendCategories = (categories) => {
   const normalized = dedupeCategories(categories).filter((category) => !SPEND_CATEGORIES.includes(category));
   getStore()?.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(normalized));
+  return normalized;
+};
+
+export const loadHiddenSpendCategories = () => {
+  const raw = getStore()?.getItem(HIDDEN_CATEGORIES_KEY);
+  if (!raw) return [];
+
+  try {
+    const stored = JSON.parse(raw);
+    if (!Array.isArray(stored)) return [];
+    return dedupeCategories(stored);
+  } catch {
+    return [];
+  }
+};
+
+export const saveHiddenSpendCategories = (categories) => {
+  const normalized = dedupeCategories(categories);
+  getStore()?.setItem(HIDDEN_CATEGORIES_KEY, JSON.stringify(normalized));
   return normalized;
 };
 
