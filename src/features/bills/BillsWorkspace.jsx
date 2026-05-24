@@ -19,7 +19,6 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
-import LiveDateTime from '../../components/layout/LiveDateTime.jsx';
 import BillTotalsEstimateBar from './BillTotalsEstimateBar.jsx';
 import LedgerMoneyChips from './LedgerMoneyChips.jsx';
 import { useExchangeRates } from './useExchangeRates.js';
@@ -718,8 +717,6 @@ export default function BillsWorkspace() {
 
   return (
     <section className="bill-workspace" aria-label="Recurring bill ledger">
-      <LiveDateTime />
-
       <nav className="ledger-switcher" aria-label="Money workspace">
         <button
           className={activeLedger === 'bills' ? 'is-active' : ''}

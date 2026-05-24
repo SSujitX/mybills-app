@@ -475,21 +475,44 @@ svg {
 
 .app-header {
   background:
-    linear-gradient(180deg, rgba(7, 7, 10, 0.98), rgba(7, 7, 10, 0.92));
+    linear-gradient(180deg, rgba(7, 7, 10, 0.98), rgba(7, 7, 10, 0.94) 68%, rgba(7, 7, 10, 0.88));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-subtle);
-  display: flex;
   flex-shrink: 0;
-  justify-content: center;
   margin: 0 calc(var(--app-pad-x) * -1) 0.85rem;
   padding:
     calc(0.5rem + env(safe-area-inset-top, 0px))
     var(--app-pad-x)
-    0.58rem;
+    0.62rem;
   position: sticky;
   top: 0;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
   z-index: 100;
+}
+
+.app-header::after {
+  background: linear-gradient(90deg, transparent, rgba(45, 212, 191, 0.34), transparent);
+  bottom: -1px;
+  content: "";
+  height: 1px;
+  left: 0;
+  opacity: 0.48;
+  position: absolute;
+  right: 0;
+}
+
+.app-header-inner {
+  align-items: center;
+  display: grid;
+  gap: 0.56rem;
+  justify-items: center;
+  margin: 0 auto;
+  max-width: 1024px;
+  width: 100%;
 }
 
 .app-header-brand {
@@ -590,8 +613,8 @@ svg {
 .live-datetime {
   align-items: center;
   align-self: center;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.095);
   border-radius: 999px;
   color: var(--text-secondary);
   display: inline-flex;
@@ -601,8 +624,9 @@ svg {
   gap: 0.65rem;
   justify-content: center;
   max-width: 100%;
-  min-height: 2.5rem;
-  padding: 0.42rem 0.95rem;
+  min-height: 2.26rem;
+  padding: 0.34rem 0.82rem;
+  box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.035);
 }
 
 .live-datetime span {
